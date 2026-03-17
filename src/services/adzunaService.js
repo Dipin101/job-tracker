@@ -3,6 +3,7 @@ const IS_DEV = process.env.NODE_ENV !== "production";
 const ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs";
 const { MOCK_JOBS } = require("./mockData");
 
+//separating job title and experience
 const inferExperienceLevel = (title = "", description = "") => {
   const text = (title + " " + description).toLowerCase();
   if (
@@ -24,6 +25,7 @@ const inferExperienceLevel = (title = "", description = "") => {
   return "mid";
 };
 
+//Normalize raw adzuna job into our standard shape
 const normalizeAdzunaJob = (raw, country) => {
   return {
     external_id: `adzuna-${raw.id}`,
@@ -44,6 +46,7 @@ const normalizeAdzunaJob = (raw, country) => {
   };
 };
 
+//Only keeping job posted in the last 48 hours
 const filterRecent = (jobs) => {
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   return jobs.filter((job) => new Date(job.posted_at) >= cutoff);
