@@ -1,10 +1,22 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";  -- gives us basically uuid_generate_v4()
 
-CREATE TYPE experience_level AS ENUM ('entry', 'mid', 'senior');
-CREATE TYPE application_status AS ENUM ('applied', 'skipped', 'pending', 'job_closed', 'failed');
+-- create type if not exist doesn't happen in postgre the work around is to 
+--do $$ begin 
+--do $$ --> start an anonymous code block
+--begin --> tries this block 
+-- creates the enum --> Exception -> if it fails
+-- when duplicate object then its set to null and end $$-> ends it
+DO $$ BEGIN
+  CREATE TYPE experience_level AS ENUM ('entry', 'mid', 'senior');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$ BEGIN
+  CREATE TYPE application_status AS ENUM ('applied', 'skipped', 'pending', 'job_closed', 'failed');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Users
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
@@ -22,7 +34,7 @@ CREATE TABLE users (
 );
 
 -- Base resumes
-CREATE TABLE base_resumes (
+CREATE TABLE IF NOT EXISTS base_resumes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE, --deleteon cascade means they are foreign key related to parent and if there is no parent delete this child it references
   file_url VARCHAR(255) NOT NULL,
@@ -32,7 +44,7 @@ CREATE TABLE base_resumes (
 );
 
 -- Github profiles
-CREATE TABLE github_profiles (
+CREATE TABLE IF NOT EXISTS github_profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   github_url VARCHAR(255) NOT NULL,
@@ -41,7 +53,7 @@ CREATE TABLE github_profiles (
 );
 
 -- Jobs
-CREATE TABLE jobs (
+CREATE TABLE IF NOT EXISTS jobs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   adzuna_job_id VARCHAR(255) UNIQUE NOT NULL,
   title VARCHAR(255) NOT NULL,
@@ -56,7 +68,7 @@ CREATE TABLE jobs (
 );
 
 -- AI resumes
-CREATE TABLE ai_resumes (
+CREATE TABLE IF NOT EXISTS ai_resumes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   base_resume_id UUID NOT NULL REFERENCES base_resumes(id) ON DELETE CASCADE,
@@ -66,7 +78,7 @@ CREATE TABLE ai_resumes (
 );
 
 -- Cover letters
-CREATE TABLE cover_letters (
+CREATE TABLE IF NOT EXISTS cover_letters (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -75,7 +87,7 @@ CREATE TABLE cover_letters (
 );
 
 -- Applications
-CREATE TABLE applications (
+CREATE TABLE IF NOT EXISTS applications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
