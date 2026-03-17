@@ -31,7 +31,7 @@ const uploadResume = async (req, res) => {
           role: "user",
           content: `Extract all technical and professional skills from this CV
                     Return ONLY a JSON array of strings, nothing else.
-                    Example: ["Javascript", "React", "Node.js", "PostgreSQL"]
+                    Example: ["Javascript", "React", "Node.js", "PostgreSQL", "MongoDB"]
 
                     CV TEXT:${rawText}`,
         },
