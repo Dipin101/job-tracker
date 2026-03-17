@@ -45,7 +45,7 @@ const connectGithub = async (req, res) => {
           role: "user",
           content: `Analyze these GitHub repositories and extract all technical skills.
           Return ONLY a JSON array of strings, nothing else.
-          Example: ["JavaScript", "React", "Node.js", "PostgreSQL"]
+          Example: ["JavaScript", "React", "Node.js", "PostgreSQL","MongoDB"]
           
           REPOSITORIES:
           ${JSON.stringify(repoSummary, null, 2)}`,
