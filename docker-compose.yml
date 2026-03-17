@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: jobtracker_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+  redis:
+    image: redis:7
+    container_name: jobtracker_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+  app:
+    build: .
+    container_name: jobtracker_app
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+volumes:
+  postgres_data:
