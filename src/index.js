@@ -13,6 +13,8 @@ const resumeRoutes = require("./routes/resumeRoutes");
 app.use("/api/resume", resumeRoutes);
 const githubRoutes = require("./routes/githubRoutes");
 app.use("/api/github", githubRoutes);
+const jobRoutes = require("./routes/jobRoutes");
+app.use("/api/jobs", jobRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Job Tracker API is running." });
@@ -20,4 +22,12 @@ app.get("/", (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  if (process.env.NODE_ENV === "production") {
+    const { startCronJobs } = require("./jobs/cronJob");
+    startCronJobs();
+  } else {
+    console.log(
+      "[Cron] Skipped in dev — use POST /api/jobs/trigger to test manually",
+    );
+  }
 });
