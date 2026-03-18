@@ -19,6 +19,8 @@ const matchingRoutes = require("./routes/matchingRoutes");
 app.use("/api/matching", matchingRoutes);
 const documentRoutes = require("./routes/documentRoutes");
 app.use("/api/documents", documentRoutes);
+const engineRoutes = require("./routes/applicationEngineRoutes");
+app.use("/api/engine", engineRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Job Tracker API is running." });
