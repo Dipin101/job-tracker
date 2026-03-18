@@ -3,7 +3,7 @@ const { getLatestBatch, fetchAndStoreJobs } = require("../services/jobService");
 
 // GET /api/jobs
 // Paginated job list with optional filters
-async function getJobs(req, res) {
+const getJobs = async (req, res) => {
   try {
     const {
       source,
@@ -62,11 +62,11 @@ async function getJobs(req, res) {
     console.error("[JobController] getJobs error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve jobs" });
   }
-}
+};
 
 // GET /api/jobs/latest
 // Returns most recent cached batch from Redis (falls back to DB)
-async function getLatestJobs(req, res) {
+const getLatestJobs = async (req, res) => {
   try {
     const jobs = await getLatestBatch();
     return res.json({ jobs, count: jobs.length });
@@ -74,11 +74,11 @@ async function getLatestJobs(req, res) {
     console.error("[JobController] getLatestJobs error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve latest jobs" });
   }
-}
+};
 
 // GET /api/jobs/:id
 // Single job by UUID
-async function getJobById(req, res) {
+const getJobById = async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM jobs WHERE id = $1", [
       req.params.id,
@@ -90,15 +90,16 @@ async function getJobById(req, res) {
     console.error("[JobController] getJobById error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve job" });
   }
-}
+};
 
 // POST /api/jobs/trigger
 // Manually trigger a job fetch — useful for testing without waiting for cron
-async function triggerFetch(req, res) {
+const triggerFetch = async (req, res) => {
   try {
     const { query = "software engineer" } = req.body;
-    console.log(`[JobController] Manual trigger by user ${req.user.id}`);
-    const newJobs = await fetchAndStoreJobs(req.user, query);
+    console.log(`[JobController] Manual trigger by user ${req.user.userId}`);
+    const user = { ...req.user, id: req.user.userId };
+    const newJobs = await fetchAndStoreJobs(user, query);
     return res.json({
       message: "Job fetch complete",
       newJobsFound: newJobs.length,
@@ -108,6 +109,6 @@ async function triggerFetch(req, res) {
     console.error("[JobController] triggerFetch error:", err.message);
     return res.status(500).json({ error: "Job fetch failed" });
   }
-}
+};
 
 module.exports = { getJobs, getLatestJobs, getJobById, triggerFetch };

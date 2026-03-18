@@ -10,7 +10,7 @@ const MOCK_JOBS = [
     title: "Senior Backend Engineer",
     company: "Stripe",
     location: "Remote",
-    country: "gb",
+    country: "ca",
     description:
       "We are looking for a Senior Backend Engineer to join our payments infrastructure team. " +
       "You will work with Node.js, PostgreSQL, Redis, and distributed systems at scale. " +
@@ -29,7 +29,7 @@ const MOCK_JOBS = [
     title: "Full Stack Developer",
     company: "Monzo",
     location: "London, UK",
-    country: "gb",
+    country: "ca",
     description:
       "Join Monzo as a Full Stack Developer building the future of banking. " +
       "You will own features end-to-end across React frontend and Node.js backend. " +
@@ -47,7 +47,7 @@ const MOCK_JOBS = [
     title: "Junior Software Engineer",
     company: "Thoughtworks",
     location: "Manchester, UK",
-    country: "gb",
+    country: "ca",
     description:
       "We are hiring a Junior Software Engineer to join our growing consultancy team. " +
       "You will work across a variety of client projects using modern web technologies. " +
@@ -65,7 +65,7 @@ const MOCK_JOBS = [
     title: "Backend Engineer (Node.js)",
     company: "Revolut",
     location: "Remote",
-    country: "gb",
+    country: "ca",
     description:
       "Revolut is looking for a Backend Engineer to scale our core financial platform. " +
       "You will design and build high-throughput APIs used by millions of users daily. " +
@@ -83,7 +83,7 @@ const MOCK_JOBS = [
     title: "React Frontend Developer",
     company: "Deliveroo",
     location: "London, UK",
-    country: "gb",
+    country: "ca",
     description:
       "Deliveroo is hiring a React Frontend Developer to build world-class consumer experiences. " +
       "Strong React, TypeScript, and performance optimisation skills required. " +
@@ -101,7 +101,7 @@ const MOCK_JOBS = [
     title: "DevOps Engineer",
     company: "Wise",
     location: "Remote",
-    country: "gb",
+    country: "ca",
     description:
       "Wise is looking for a DevOps Engineer to help us scale our global infrastructure. " +
       "You will manage Kubernetes clusters, CI/CD pipelines, and cloud cost optimisation. " +
@@ -111,7 +111,7 @@ const MOCK_JOBS = [
     salary_max: 115000,
     experience_level: "senior",
     skills_required: ["Kubernetes", "Terraform", "AWS", "Docker", "Linux"],
-    posted_at: hoursAgo(30),
+    posted_at: hoursAgo(20),
   },
 ];
 

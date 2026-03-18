@@ -9,9 +9,10 @@ const { getUserSkills, getThresholds } = require("../services/matchingService");
 // Process all unmatched jobs for the logged in user
 const runMatching = async (req, res) => {
   try {
+    console.log("req.user", req.user);
     // Get full user row from DB (req.user from JWT only has id + email)
     const result = await db.query("SELECT * FROM users WHERE id = $1", [
-      req.user.id,
+      req.user.userId,
     ]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
@@ -32,7 +33,7 @@ const runMatching = async (req, res) => {
 const matchSingleJob = async (req, res) => {
   try {
     const userResult = await db.query("SELECT * FROM users WHERE id = $1", [
-      req.user.id,
+      req.user.userId,
     ]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
@@ -65,10 +66,10 @@ const matchSingleJob = async (req, res) => {
 // Return the logged in user's combined skills
 const getMySkills = async (req, res) => {
   try {
-    const skills = await getUserSkills(req.user.id);
+    const skills = await getUserSkills(req.user.userId);
     const thresholds = await db.query(
       "SELECT experience_level, match_threshold FROM users WHERE id = $1",
-      [req.user.id],
+      [req.user.userId],
     );
     const user = thresholds.rows[0];
     const defaultThresholds = getThresholds(user?.experience_level);
@@ -95,7 +96,7 @@ const getApplications = async (req, res) => {
     const { status, is_favourite, limit = 20, offset = 0 } = req.query;
 
     const conditions = ["a.user_id = $1"];
-    const params = [req.user.id];
+    const params = [req.user.userId];
     let i = 2;
 
     if (status) {
