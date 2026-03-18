@@ -41,7 +41,7 @@ const client = new Anthropic();
 /**
  * Fetch everything needed to generate documents for a user + job.
  */
-async function getGenerationContext(userId, jobId) {
+const getGenerationContext = async (userId, jobId) => {
   const [userResult, jobResult, resumeResult, githubResult, applicationResult] =
     await Promise.all([
       db.query("SELECT * FROM users WHERE id = $1", [userId]),
@@ -75,13 +75,13 @@ async function getGenerationContext(userId, jobId) {
   }
 
   return { user, job, resume, github, application };
-}
+};
 
 /**
  * Generate a tailored resume using Anthropic.
  * Never fabricates skills — only uses what's in the base CV + GitHub.
  */
-async function generateResume(userId, jobId) {
+const generateResume = async (userId, jobId) => {
   const { user, job, resume, github, application } = await getGenerationContext(
     userId,
     jobId,
@@ -152,13 +152,13 @@ Write a tailored resume that emphasizes the matched skills and relevant experien
     `[DocumentService] Resume generated for job "${job.title}" at ${job.company}`,
   );
   return result.rows[0];
-}
+};
 
 /**
  * Generate a cover letter using Anthropic.
  * Personalised to the job, honest about skills.
  */
-async function generateCoverLetter(userId, jobId) {
+const generateCoverLetter = async (userId, jobId) => {
   const { user, job, resume, github, application } = await getGenerationContext(
     userId,
     jobId,
@@ -228,18 +228,18 @@ Write a cover letter addressed to the hiring team at ${job.company}.`;
     `[DocumentService] Cover letter generated for job "${job.title}" at ${job.company}`,
   );
   return result.rows[0];
-}
+};
 
 /**
  * Generate both resume and cover letter for a job in one call.
  */
-async function generateDocuments(userId, jobId) {
+const generateDocuments = async (userId, jobId) => {
   const [resume, coverLetter] = await Promise.all([
     generateResume(userId, jobId),
     generateCoverLetter(userId, jobId),
   ]);
 
   return { resume, coverLetter };
-}
+};
 
 module.exports = { generateResume, generateCoverLetter, generateDocuments };
