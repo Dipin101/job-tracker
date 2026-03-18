@@ -1,0 +1,126 @@
+const db = require("../db/db");
+const {
+  processJobForUser,
+  processAllJobsForUser,
+} = require("../services/applicationService");
+const { getUserSkills, getThresholds } = require("../services/matchingService");
+
+// POST /api/matching/run
+// Process all unmatched jobs for the logged in user
+const runMatching = async (req, res) => {
+  try {
+    // Get full user row from DB (req.user from JWT only has id + email)
+    const result = await db.query("SELECT * FROM users WHERE id = $1", [
+      req.user.id,
+    ]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const user = result.rows[0];
+    const summary = await processAllJobsForUser(user);
+
+    return res.json({ message: "Matching complete", ...summary });
+  } catch (err) {
+    console.error("[MatchingController] runMatching error:", err.message);
+    return res.status(500).json({ error: "Matching failed" });
+  }
+};
+
+// POST /api/matching/job/:jobId
+// Match a single job for the logged in user
+const matchSingleJob = async (req, res) => {
+  try {
+    const userResult = await db.query("SELECT * FROM users WHERE id = $1", [
+      req.user.id,
+    ]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const jobResult = await db.query("SELECT * FROM jobs WHERE id = $1", [
+      req.params.jobId,
+    ]);
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const user = userResult.rows[0];
+    const job = jobResult.rows[0];
+
+    const application = await processJobForUser(user, job);
+
+    if (!application) {
+      return res.json({ message: "Job skipped", application: null });
+    }
+
+    return res.json({ message: "Job processed", application });
+  } catch (err) {
+    console.error("[MatchingController] matchSingleJob error:", err.message);
+    return res.status(500).json({ error: "Matching failed" });
+  }
+};
+
+// GET /api/matching/skills
+// Return the logged in user's combined skills
+const getMySkills = async (req, res) => {
+  try {
+    const skills = await getUserSkills(req.user.id);
+    const thresholds = await db.query(
+      "SELECT experience_level, match_threshold FROM users WHERE id = $1",
+      [req.user.id],
+    );
+    const user = thresholds.rows[0];
+    const defaultThresholds = getThresholds(user?.experience_level);
+
+    return res.json({
+      skills,
+      count: skills.length,
+      experience_level: user?.experience_level,
+      thresholds: {
+        ...defaultThresholds,
+        current: user?.match_threshold || defaultThresholds.default,
+      },
+    });
+  } catch (err) {
+    console.error("[MatchingController] getMySkills error:", err.message);
+    return res.status(500).json({ error: "Failed to retrieve skills" });
+  }
+};
+
+// GET /api/matching/applications
+// Return all applications for the logged in user
+const getApplications = async (req, res) => {
+  try {
+    const { status, is_favourite, limit = 20, offset = 0 } = req.query;
+
+    const conditions = ["a.user_id = $1"];
+    const params = [req.user.id];
+    let i = 2;
+
+    if (status) {
+      conditions.push(`a.status = $${i++}`);
+      params.push(status);
+    }
+    if (is_favourite === "true") {
+      conditions.push(`a.is_favourite = true`);
+    }
+
+    const result = await db.query(
+      `SELECT a.*, j.title, j.company, j.location, j.url, j.salary_min, j.salary_max
+       FROM applications a
+       JOIN jobs j ON j.id = a.job_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY a.match_score DESC, a.applied_at DESC
+       LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, parseInt(limit), parseInt(offset)],
+    );
+
+    return res.json({ applications: result.rows, count: result.rows.length });
+  } catch (err) {
+    console.error("[MatchingController] getApplications error:", err.message);
+    return res.status(500).json({ error: "Failed to retrieve applications" });
+  }
+};
+
+module.exports = { runMatching, matchSingleJob, getMySkills, getApplications };
