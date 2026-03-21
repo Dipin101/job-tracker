@@ -5,12 +5,19 @@ const {
 } = require("../services/applicationService");
 const { getUserSkills, getThresholds } = require("../services/matchingService");
 
+// ─── Helper — build userPrefs from user row ───────────────────────────────────
+const buildUserPrefs = (user) => ({
+  city: user.city || null,
+  country: user.country || null,
+  remote_ok: user.remote_ok ?? true,
+  preferred_companies: user.preferred_companies || [],
+  blocked_companies: user.blocked_companies || [],
+});
+
 // POST /api/matching/run
 // Process all unmatched jobs for the logged in user
 const runMatching = async (req, res) => {
   try {
-    console.log("req.user", req.user);
-    // Get full user row from DB (req.user from JWT only has id + email)
     const result = await db.query("SELECT * FROM users WHERE id = $1", [
       req.user.userId,
     ]);
@@ -19,7 +26,8 @@ const runMatching = async (req, res) => {
     }
 
     const user = result.rows[0];
-    const summary = await processAllJobsForUser(user);
+    const userPrefs = buildUserPrefs(user);
+    const summary = await processAllJobsForUser(user, userPrefs);
 
     return res.json({ message: "Matching complete", ...summary });
   } catch (err) {
@@ -48,8 +56,9 @@ const matchSingleJob = async (req, res) => {
 
     const user = userResult.rows[0];
     const job = jobResult.rows[0];
+    const userPrefs = buildUserPrefs(user);
 
-    const application = await processJobForUser(user, job);
+    const application = await processJobForUser(user, job, userPrefs);
 
     if (!application) {
       return res.json({ message: "Job skipped", application: null });
@@ -63,10 +72,11 @@ const matchSingleJob = async (req, res) => {
 };
 
 // GET /api/matching/skills
-// Return the logged in user's combined skills
+// Return the logged in user's combined skills + thresholds
 const getMySkills = async (req, res) => {
   try {
     const skills = await getUserSkills(req.user.userId);
+
     const thresholds = await db.query(
       "SELECT experience_level, match_threshold FROM users WHERE id = $1",
       [req.user.userId],
@@ -90,7 +100,7 @@ const getMySkills = async (req, res) => {
 };
 
 // GET /api/matching/applications
-// Return all applications for the logged in user
+// Return all applications for the logged in user with optional filters
 const getApplications = async (req, res) => {
   try {
     const { status, is_favourite, limit = 20, offset = 0 } = req.query;

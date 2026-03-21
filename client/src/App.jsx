@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Applications from "./pages/Applications";
 import Upload from "./pages/Upload";
+import Profile from "./pages/Profile";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -39,6 +40,14 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <Upload />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

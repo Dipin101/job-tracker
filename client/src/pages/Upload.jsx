@@ -1,7 +1,10 @@
 import { useState } from "react";
 import api from "../api/axios";
+import Navbar from "../components/Navbar";
+import { useAuth } from "../context/AuthContext";
 
 const Upload = () => {
+  const { pipelineRunning } = useAuth();
   const [cvFile, setCvFile] = useState(null);
   const [githubUrl, setGithubUrl] = useState("");
   const [cvLoading, setCvLoading] = useState(false);
@@ -57,30 +60,24 @@ const Upload = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Navbar */}
-      <nav className="border-b border-gray-800 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Job Tracker</h1>
-        <div className="flex items-center gap-4">
-          <a
-            href="/dashboard"
-            className="text-gray-400 hover:text-white transition"
-          >
-            Dashboard
-          </a>
-          <a
-            href="/applications"
-            className="text-gray-400 hover:text-white transition"
-          >
-            Applications
-          </a>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="max-w-2xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-8">Upload CV & Connect GitHub</h2>
 
+        {/* Pipeline running warning */}
+        {pipelineRunning && (
+          <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-800 rounded-xl text-yellow-400 text-sm">
+            ⚠️ Pipeline is currently running — uploading a new CV or
+            reconnecting GitHub now may affect active applications. Please wait
+            until it finishes.
+          </div>
+        )}
+
         {/* CV Upload */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
+        <div
+          className={`bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6 ${pipelineRunning ? "opacity-60" : ""}`}
+        >
           <h3 className="text-lg font-semibold mb-2">Upload CV</h3>
           <p className="text-gray-400 text-sm mb-4">
             Upload your base CV as a PDF. AI will extract your skills
@@ -91,13 +88,14 @@ const Upload = () => {
               <input
                 type="file"
                 accept=".pdf"
+                disabled={pipelineRunning}
                 onChange={(e) => setCvFile(e.target.files[0])}
-                className="w-full text-gray-300 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-700 file:text-white hover:file:bg-gray-600 cursor-pointer"
+                className="w-full text-gray-300 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-700 file:text-white hover:file:bg-gray-600 cursor-pointer disabled:cursor-not-allowed"
               />
             </div>
             <button
               type="submit"
-              disabled={cvLoading || !cvFile}
+              disabled={cvLoading || !cvFile || pipelineRunning}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-medium transition"
             >
               {cvLoading ? "Uploading..." : "Upload CV"}
@@ -113,7 +111,9 @@ const Upload = () => {
         </div>
 
         {/* GitHub Connect */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+        <div
+          className={`bg-gray-900 border border-gray-800 rounded-2xl p-6 ${pipelineRunning ? "opacity-60" : ""}`}
+        >
           <h3 className="text-lg font-semibold mb-2">Connect GitHub</h3>
           <p className="text-gray-400 text-sm mb-4">
             Connect your GitHub profile so AI can analyze your repos and extract
@@ -124,15 +124,16 @@ const Upload = () => {
               <input
                 type="url"
                 value={githubUrl}
+                disabled={pipelineRunning}
                 onChange={(e) => setGithubUrl(e.target.value)}
                 placeholder="https://github.com/yourusername"
                 required
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition disabled:cursor-not-allowed"
               />
             </div>
             <button
               type="submit"
-              disabled={githubLoading || !githubUrl}
+              disabled={githubLoading || !githubUrl || pipelineRunning}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-medium transition"
             >
               {githubLoading ? "Connecting..." : "Connect GitHub"}

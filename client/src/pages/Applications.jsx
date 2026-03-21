@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../api/axios";
+import Navbar from "../components/Navbar";
 
 const Applications = () => {
   const [applications, setApplications] = useState([]);
@@ -54,23 +55,7 @@ const Applications = () => {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Navbar */}
-      <nav className="border-b border-gray-800 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Job Tracker</h1>
-        <div className="flex items-center gap-4">
-          <a
-            href="/dashboard"
-            className="text-gray-400 hover:text-white transition"
-          >
-            Dashboard
-          </a>
-          <a
-            href="/upload"
-            className="text-gray-400 hover:text-white transition"
-          >
-            Upload CV
-          </a>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="max-w-6xl mx-auto px-6 py-10">
         <h2 className="text-2xl font-bold mb-6">Applications</h2>

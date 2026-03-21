@@ -33,7 +33,7 @@ const register = async (req, res) => {
       "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email, created_at",
       [email, hashedPassword],
     );
-    const user = result.rows[0];
+    // const user = result.rows[0];
 
     res.status(201).json({ message: "Registered successfully. Please Login" });
   } catch (err) {
@@ -136,4 +136,79 @@ const logout = async (req, res) => {
   }
 };
 
-module.exports = { register, login, refresh, logout };
+// Get profile
+const getProfile = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, email, full_name, phone, location, work_authorization, years_experience, salary_expectation_min, salary_expectation_max, linkedin_url, portfolio_url, bio_summary, job_titles, match_threshold, experience_level, country, job_search_status, is_active FROM users WHERE id = $1",
+      [req.user.userId],
+    );
+    return res.json({ user: result.rows[0] });
+  } catch (err) {
+    console.error("Get profile error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update profile
+const updateProfile = async (req, res) => {
+  try {
+    const {
+      full_name,
+      phone,
+      location,
+      work_authorization,
+      years_experience,
+      salary_expectation_min,
+      salary_expectation_max,
+      linkedin_url,
+      portfolio_url,
+      bio_summary,
+      job_titles,
+      match_threshold,
+      experience_level,
+      country,
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE users SET
+        full_name = $1, phone = $2, location = $3, work_authorization = $4,
+        years_experience = $5, salary_expectation_min = $6, salary_expectation_max = $7,
+        linkedin_url = $8, portfolio_url = $9, bio_summary = $10,
+        job_titles = $11, match_threshold = $12, experience_level = $13, country = $14
+       WHERE id = $15
+       RETURNING id, email, full_name, experience_level, country, match_threshold`,
+      [
+        full_name,
+        phone,
+        location,
+        work_authorization,
+        years_experience,
+        salary_expectation_min,
+        salary_expectation_max,
+        linkedin_url,
+        portfolio_url,
+        bio_summary,
+        job_titles,
+        match_threshold,
+        experience_level,
+        country,
+        req.user.userId,
+      ],
+    );
+
+    return res.json({ message: "Profile updated", user: result.rows[0] });
+  } catch (err) {
+    console.error("Update profile error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  refresh,
+  logout,
+  getProfile,
+  updateProfile,
+};

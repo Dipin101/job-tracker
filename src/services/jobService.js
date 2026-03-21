@@ -2,9 +2,15 @@ const db = require("../db/db");
 const redis = require("../config/redis");
 const { fetchAdzunaJobs } = require("./adzunaService");
 const { fetchIndeedJobs } = require("./indeedRSSService");
+const { fetchJoobleJobs } = require("./joobleService");
+const { fetchJobBankJobs } = require("./jobBankService");
+const { fetchArbeitnowJobs } = require("./arbeitNowService");
 
 const BATCH_CACHE_KEY = "jobs:batch:latest";
-const CACHE_TTL = 60 * 60 * 6; //6 hours
+const CACHE_TTL = 60 * 60 * 6; // 6 hours
+
+// Small delay helper to avoid rate limiting
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 /**
  * Fetch jobs from all sources, deduplicate, save to DB, cache in Redis.
@@ -12,36 +18,56 @@ const CACHE_TTL = 60 * 60 * 6; //6 hours
  * @param {Object} user  - User row from DB (needs id, country)
  * @param {string} query - Search keywords
  */
-
-const fetchAndStoreJobs = async (user, query = "software engineer") => {
+const fetchAndStoreJobs = async (user, query = "junior software developer") => {
   const country = user.country || "ca";
   console.log(
     `[JobService] Fetching for user ${user.id} | country: ${country} | query: "${query}"`,
   );
 
-  // Fetch from all sources in parallel
-  const [adzunaResult, indeedResult] = await Promise.allSettled([
-    fetchAdzunaJobs(country, query),
-    fetchIndeedJobs(query, "", country),
-  ]);
+  // ── Adzuna — sequential with delay to avoid 429 ──────────────────────────
+  const adzunaQueries = [
+    query,
+    "junior full stack developer",
+    "junior software engineer",
+  ];
+  const adzunaJobs = [];
+  for (const q of adzunaQueries) {
+    const jobs = await fetchAdzunaJobs(country, q);
+    adzunaJobs.push(...jobs);
+    await delay(1500);
+  }
 
-  if (adzunaResult.status === "rejected") {
-    console.error("[JobService] Adzuna failed:", adzunaResult.reason);
-  }
-  if (indeedResult.status === "rejected") {
+  // ── Other sources in parallel ─────────────────────────────────────────────
+  const [indeedResult, joobleResult, jobBankResult, arbeitnowResult] =
+    await Promise.allSettled([
+      fetchIndeedJobs(query, "", country),
+      fetchJoobleJobs(query, country),
+      country === "ca" ? fetchJobBankJobs(query) : Promise.resolve([]),
+      fetchArbeitnowJobs(query, country),
+    ]);
+
+  if (indeedResult.status === "rejected")
     console.error("[JobService] Indeed failed:", indeedResult.reason);
-  }
+  if (joobleResult.status === "rejected")
+    console.error("[JobService] Jooble failed:", joobleResult.reason);
+  if (jobBankResult.status === "rejected")
+    console.error("[JobService] Job Bank failed:", jobBankResult.reason);
+  if (arbeitnowResult.status === "rejected")
+    console.error("[JobService] Arbeitnow failed:", arbeitnowResult.reason);
 
   const allFetched = [
-    ...(adzunaResult.status === "fulfilled" ? adzunaResult.value : []),
+    ...adzunaJobs,
     ...(indeedResult.status === "fulfilled" ? indeedResult.value : []),
+    ...(joobleResult.status === "fulfilled" ? joobleResult.value : []),
+    ...(jobBankResult.status === "fulfilled" ? jobBankResult.value : []),
+    ...(arbeitnowResult.status === "fulfilled" ? arbeitnowResult.value : []),
   ];
 
   console.log(`[JobService] Total fetched: ${allFetched.length}`);
 
   if (allFetched.length === 0) return [];
 
-  // 2. Deduplicate against DB
+  // Deduplicate against DB
   const externalIds = allFetched.map((j) => j.external_id);
   const existing = await db.query(
     "SELECT external_id FROM jobs WHERE external_id = ANY($1)",
@@ -56,7 +82,7 @@ const fetchAndStoreJobs = async (user, query = "software engineer") => {
 
   if (newJobs.length === 0) return [];
 
-  // 3. Save to DB
+  // Save to DB
   const savedJobs = [];
   for (const job of newJobs) {
     try {
@@ -95,7 +121,7 @@ const fetchAndStoreJobs = async (user, query = "software engineer") => {
 
   console.log(`[JobService] Saved ${savedJobs.length} jobs to DB`);
 
-  // 4. Cache job IDs in Redis
+  // Cache job IDs in Redis
   try {
     await redis.setEx(
       BATCH_CACHE_KEY,
@@ -104,7 +130,6 @@ const fetchAndStoreJobs = async (user, query = "software engineer") => {
     );
     console.log(`[JobService] Cached ${savedJobs.length} job IDs in Redis`);
   } catch (err) {
-    // Redis failure is non-fatal — DB is source of truth
     console.error("[JobService] Redis cache failed (non-fatal):", err.message);
   }
 
@@ -115,7 +140,7 @@ const fetchAndStoreJobs = async (user, query = "software engineer") => {
  * Get latest batch from Redis cache.
  * Falls back to recent DB query if cache is cold.
  */
-async function getLatestBatch() {
+const getLatestBatch = async () => {
   try {
     const cached = await redis.get(BATCH_CACHE_KEY);
     if (cached) {
@@ -142,13 +167,12 @@ async function getLatestBatch() {
      LIMIT 100`,
   );
   return result.rows;
-}
+};
 
 /**
  * Push a failed job application to the Redis retry queue.
- * Day 7 will process this.
  */
-async function pushToRetryQueue(jobId, userId, reason = "unknown") {
+const pushToRetryQueue = async (jobId, userId, reason = "unknown") => {
   try {
     const payload = JSON.stringify({
       jobId,
@@ -163,6 +187,6 @@ async function pushToRetryQueue(jobId, userId, reason = "unknown") {
   } catch (err) {
     console.error("[JobService] Failed to push retry queue:", err.message);
   }
-}
+};
 
 module.exports = { fetchAndStoreJobs, getLatestBatch, pushToRetryQueue };

@@ -1,46 +1,90 @@
 require("dotenv").config();
 const express = require("express");
-const cookieParser = require("cookie-parser");
-const app = express();
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
+const helmet = require("helmet");
+const logger = require("./config/logger");
+const { apiLimiter, pipelineLimiter } = require("./middleware/rateLimiter");
+
+const app = express();
 const port = process.env.PORT || 5000;
 
+// ── Security ───────────────────────────────────────────────────────────────
+app.use(helmet());
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   }),
 );
+
+// ── Middleware ─────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(cookieParser());
 
+// ── Rate limiting ──────────────────────────────────────────────────────────
+app.use("/api/", apiLimiter);
+
+// ── Routes ─────────────────────────────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
-app.use("/api/auth", authRoutes);
 const resumeRoutes = require("./routes/resumeRoutes");
-app.use("/api/resume", resumeRoutes);
 const githubRoutes = require("./routes/githubRoutes");
-app.use("/api/github", githubRoutes);
 const jobRoutes = require("./routes/jobRoutes");
-app.use("/api/jobs", jobRoutes);
 const matchingRoutes = require("./routes/matchingRoutes");
-app.use("/api/matching", matchingRoutes);
 const documentRoutes = require("./routes/documentRoutes");
-app.use("/api/documents", documentRoutes);
 const engineRoutes = require("./routes/applicationEngineRoutes");
-app.use("/api/engine", engineRoutes);
+const applyRoutes = require("./routes/applyRoutes");
+const pipelineRoutes = require("./routes/pipelineRoutes");
+
+app.use("/api/auth", authRoutes);
+app.use("/api/resume", resumeRoutes);
+app.use("/api/github", githubRoutes);
+app.use("/api/jobs", jobRoutes);
+app.use("/api/matching", matchingRoutes);
+app.use("/api/documents", documentRoutes);
+app.use("/api/engine", pipelineLimiter, engineRoutes);
+app.use("/api/apply", applyRoutes);
+app.use("/api/pipeline", pipelineRoutes);
+
+// ── Health check ───────────────────────────────────────────────────────────
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
 
 app.get("/", (req, res) => {
   res.json({ message: "Job Tracker API is running." });
 });
 
+// ── Global error handler ───────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  logger.error(`${err.message} — ${req.method} ${req.path}`);
+  res.status(err.status || 500).json({
+    error:
+      process.env.NODE_ENV === "production"
+        ? "Internal server error"
+        : err.message,
+  });
+});
+
+// ── Start server ───────────────────────────────────────────────────────────
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  logger.info(
+    `Server running on port ${port} (${process.env.NODE_ENV || "development"})`,
+  );
+
+  const { verifyConnection } = require("./services/notificationService");
+  verifyConnection();
+
   if (process.env.NODE_ENV === "production") {
     const { startCronJobs } = require("./jobs/cronJob");
     startCronJobs();
   } else {
-    console.log(
-      "[Cron] Skipped in dev — use POST /api/jobs/trigger to test manually",
+    logger.info(
+      "Cron skipped in dev — use POST /api/engine/run to test manually",
     );
   }
 });

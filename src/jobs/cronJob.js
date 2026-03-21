@@ -36,19 +36,17 @@ const runJobFetch = async () => {
 
   console.log(`[Cron] Processing ${users.length} active user(s)`);
 
-  const {
-    runPipelineForUser,
-  } = require("../services/applicationEngineService");
+  const pipelineService = require("../services/pipelineService");
 
   for (const user of users) {
     try {
-      const result = await runPipelineForUser(user.id);
-      console.log(`[Cron] User ${user.id}:`, result);
+      await pipelineService.run(user.id, (evt) => {
+        console.log(`[Cron] User ${user.id} | ${evt.stage} | ${evt.message}`);
+      });
     } catch (err) {
       console.error(`[Cron] Error for user ${user.id}:`, err.message);
     }
   }
-
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[Cron] ===== Done in ${elapsed}s =====\n`);
 };
@@ -56,7 +54,7 @@ const runJobFetch = async () => {
 const startCronJobs = () => {
   SCHEDULES.forEach((schedule) => {
     cron.schedule(schedule, runJobFetch, {
-      timezone: "Europe/London",
+      timezone: "America/Toronto",
     });
     console.log(`[Cron] Registered: ${schedule}`);
   });
