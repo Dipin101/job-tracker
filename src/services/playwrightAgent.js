@@ -297,7 +297,7 @@ async function detectSuccess(page) {
  */
 async function applyToJob(job, user, coverLetter, resumePath) {
   const browser = await chromium.launch({
-    headless: false,
+    headless: true,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",

@@ -3,3 +3,16 @@ node_modules
 dist
 .DS_Storelogs/
 .gitignore
+logs/
+
+#Test files
+src/services/testPlaywright.js
+
+#Log files
+logs/
+*.logs
+combined.log
+error.log
+
+# OS files
+Thumbs.db
