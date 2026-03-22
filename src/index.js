@@ -25,7 +25,7 @@ app.use(cookieParser());
 // ── Rate limiting ──────────────────────────────────────────────────────────
 app.use("/api/", apiLimiter);
 
-// ── Routes ─────────────────────────────────────────────────────────────────
+// ── Routes ──────────────────────────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
 const resumeRoutes = require("./routes/resumeRoutes");
 const githubRoutes = require("./routes/githubRoutes");
@@ -45,6 +45,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/engine", pipelineLimiter, engineRoutes);
 app.use("/api/apply", applyRoutes);
 app.use("/api/pipeline", pipelineRoutes);
+app.use("/api/pipeline", pipelineLimiter, pipelineRoutes);
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {

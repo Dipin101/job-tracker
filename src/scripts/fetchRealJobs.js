@@ -428,7 +428,7 @@ const main = async () => {
   const unique = deduplicateJobs(allJobs);
   const recent = filterRecent(unique);
 
-  console.log(`After dedup + 3-day filter: ${recent.length} jobs\n`);
+  console.log(`After dedup + 2-day filter: ${recent.length} jobs\n`);
 
   if (recent.length === 0) {
     console.log("No jobs found. Check your API keys and country setting.");

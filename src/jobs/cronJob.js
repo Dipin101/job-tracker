@@ -2,11 +2,11 @@ const cron = require("node-cron");
 const db = require("../db/db");
 
 const SCHEDULES = [
-  "0 8 * * 1-5", // 8am  Mon–Fri
-  "0 10 * * 1-5", // 10am Mon–Fri
-  "0 13 * * 1-5", // 1pm  Mon–Fri
-  "0 15 * * 1-5", // 3pm  Mon–Fri
-  "0 9 * * 6,0", // 9am  Sat–Sun
+  "0 8 * * 1-5",
+  "0 10 * * 1-5",
+  "0 13 * * 1-5",
+  "0 15 * * 1-5",
+  "0 9 * * 6,0",
 ];
 
 const runJobFetch = async () => {

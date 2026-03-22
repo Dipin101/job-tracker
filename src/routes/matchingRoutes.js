@@ -10,9 +10,9 @@ const {
 
 router.use(auth);
 
-router.post("/run", runMatching); // POST /api/matching/run
-router.post("/job/:jobId", matchSingleJob); // POST /api/matching/job/:jobId
-router.get("/skills", getMySkills); // GET  /api/matching/skills
-router.get("/applications", getApplications); // GET  /api/matching/applications
+router.post("/run", runMatching);
+router.post("/job/:jobId", matchSingleJob);
+router.get("/skills", getMySkills);
+router.get("/applications", getApplications);
 
 module.exports = router;

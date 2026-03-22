@@ -4,7 +4,6 @@ const Anthropic = require("@anthropic-ai/sdk");
 
 const client = new Anthropic();
 
-// POST /api/github/connect
 const connectGithub = async (req, res) => {
   const { github_url } = req.body;
   if (!github_url) {
@@ -12,13 +11,10 @@ const connectGithub = async (req, res) => {
   }
 
   try {
-    // extract username from URL
-    // https://github.com/username → username
     const username = github_url
       .replace("https://github.com/", "")
       .replace(/\/$/, "");
 
-    // fetch repos from GitHub API
     const reposResponse = await axios.get(
       `https://api.github.com/users/${username}/repos?sort=updated&per_page=20`,
     );
@@ -28,7 +24,6 @@ const connectGithub = async (req, res) => {
       return res.status(400).json({ message: "No public repos found" });
     }
 
-    // build summary for Anthropic
     const repoSummary = repos.map((repo) => ({
       name: repo.name,
       description: repo.description,
@@ -36,7 +31,6 @@ const connectGithub = async (req, res) => {
       topics: repo.topics,
     }));
 
-    // send to Anthropic for skill analysis
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
@@ -53,11 +47,10 @@ const connectGithub = async (req, res) => {
       ],
     });
 
-    // parse skills
     const content = response.content[0].text;
-    const analyzedSkills = JSON.parse(content);
+    const cleaned = content.replace(/```json|```/g, "").trim();
+    const analyzedSkills = JSON.parse(cleaned);
 
-    // upsert to github_profiles table
     const userId = req.user.userId;
     const result = await pool.query(
       `INSERT INTO github_profiles (user_id, github_url, analyzed_skills, last_analyzed_at)

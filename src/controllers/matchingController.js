@@ -5,7 +5,6 @@ const {
 } = require("../services/applicationService");
 const { getUserSkills, getThresholds } = require("../services/matchingService");
 
-// ─── Helper — build userPrefs from user row ───────────────────────────────────
 const buildUserPrefs = (user) => ({
   city: user.city || null,
   country: user.country || null,
@@ -14,8 +13,6 @@ const buildUserPrefs = (user) => ({
   blocked_companies: user.blocked_companies || [],
 });
 
-// POST /api/matching/run
-// Process all unmatched jobs for the logged in user
 const runMatching = async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM users WHERE id = $1", [
@@ -36,8 +33,6 @@ const runMatching = async (req, res) => {
   }
 };
 
-// POST /api/matching/job/:jobId
-// Match a single job for the logged in user
 const matchSingleJob = async (req, res) => {
   try {
     const userResult = await db.query("SELECT * FROM users WHERE id = $1", [
@@ -71,8 +66,6 @@ const matchSingleJob = async (req, res) => {
   }
 };
 
-// GET /api/matching/skills
-// Return the logged in user's combined skills + thresholds
 const getMySkills = async (req, res) => {
   try {
     const skills = await getUserSkills(req.user.userId);
@@ -99,8 +92,6 @@ const getMySkills = async (req, res) => {
   }
 };
 
-// GET /api/matching/applications
-// Return all applications for the logged in user with optional filters
 const getApplications = async (req, res) => {
   try {
     const { status, is_favourite, limit = 20, offset = 0 } = req.query;

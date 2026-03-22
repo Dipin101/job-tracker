@@ -3,8 +3,8 @@ const { Resend } = require("resend");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-const FROM = "JobTracker <onboarding@resend.dev>"; // works without domain setup
-const TO = process.env.PERSONAL_EMAIL; // khatridipin10@gmail.com
+const FROM = "JobTracker <onboarding@resend.dev>";
+const TO = process.env.PERSONAL_EMAIL;
 
 const verifyConnection = () => {
   try {
@@ -72,7 +72,6 @@ const sendManualRequiredEmail = async (
     </p>
   `;
 
-  // Fetch resume + cover letter from DB
   const attachments = [];
   try {
     const db = require("../db/db");
@@ -92,8 +91,8 @@ const sendManualRequiredEmail = async (
 
     const coverResult = await db.query(
       `SELECT pdf_base64 FROM cover_letters 
-   WHERE user_id = $1 AND job_id = $2 
-   ORDER BY created_at DESC LIMIT 1`,
+       WHERE user_id = $1 AND job_id = $2 
+       ORDER BY created_at DESC LIMIT 1`,
       [job.user_id, job.id],
     );
     if (coverResult.rows[0]?.pdf_base64) {
@@ -133,16 +132,16 @@ const sendFailedEmail = async (job, error = "Unknown error") => {
   );
 };
 
-// ─── Weekly digest ─────────────────────────────────────────────────────────────
-const sendDailyDigest = async ({
-  autoApplied = [],
-  manualRequired = [],
+// ─── Weekly digest ────────────────────────────────────────────────────────────
+const sendWeeklyDigest = async ({
+  auto_applied = [],
+  manual_required = [],
   failed = [],
 }) => {
-  const total = autoApplied.length + manualRequired.length + failed.length;
+  const total = auto_applied.length + manual_required.length + failed.length;
   if (total === 0) return;
 
-  const subject = `📋 Daily Job Summary — ${autoApplied.length} applied, ${manualRequired.length} need you`;
+  const subject = `📋 Weekly Job Summary — ${auto_applied.length} applied, ${manual_required.length} need you`;
 
   const jobRow = (j) => `
     <tr>
@@ -170,15 +169,15 @@ const sendDailyDigest = async ({
     </table>`;
 
   const html = `
-    <h2 style="font-family:sans-serif">Job Application Daily Summary</h2>
+    <h2 style="font-family:sans-serif">Job Application Weekly Summary</h2>
     <p style="font-family:sans-serif;color:#6b7280">${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto", weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
-    ${section("✅ Auto-Applied", "#16a34a", autoApplied)}
-    ${section("⚠️ Manual Apply Required", "#d97706", manualRequired)}
+    ${section("✅ Auto-Applied", "#16a34a", auto_applied)}
+    ${section("⚠️ Manual Apply Required", "#d97706", manual_required)}
     ${section("❌ Failed", "#dc2626", failed)}
   `;
 
   await sendMail({ subject, html });
-  console.log(`[Notifications] 📋 Daily digest sent — ${total} jobs`);
+  console.log(`[Notifications] 📋 Weekly digest sent — ${total} jobs`);
 };
 
 module.exports = {
@@ -186,5 +185,5 @@ module.exports = {
   sendAppliedEmail,
   sendManualRequiredEmail,
   sendFailedEmail,
-  sendDailyDigest,
+  sendWeeklyDigest,
 };

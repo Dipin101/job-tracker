@@ -9,8 +9,8 @@ const {
 
 router.use(auth);
 
-router.post("/run", runPipeline); // POST /api/engine/run
-router.post("/retry", runRetryQueue); // POST /api/engine/retry
-router.post("/status", setStatus); // POST /api/engine/status
+router.post("/run", runPipeline);
+router.post("/retry", runRetryQueue);
+router.post("/status", setStatus);
 
 module.exports = router;

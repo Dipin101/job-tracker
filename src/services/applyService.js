@@ -230,9 +230,9 @@ const processAllMatched = async (
     await new Promise((r) => setTimeout(r, 2000 + Math.random() * 2000));
   }
 
-  // ── Send daily digest ───────────────────────────────────────────────────────
+  // ── Send Weekly digest ───────────────────────────────────────────────────────
   try {
-    await notificationService.sendDailyDigest(results);
+    await notificationService.sendWeeklyDigest(results);
   } catch (err) {
     console.error(`[ApplyService] Digest notification failed: ${err.message}`);
   }

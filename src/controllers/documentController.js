@@ -5,8 +5,6 @@ const {
   generateDocuments,
 } = require("../services/documentService");
 
-// POST /api/documents/resume/:jobId
-// Generate tailored resume for a specific job
 const generateResumeForJob = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -32,8 +30,6 @@ const generateResumeForJob = async (req, res) => {
   }
 };
 
-// POST /api/documents/cover-letter/:jobId
-// Generate cover letter for a specific job
 const generateCoverLetterForJob = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -59,8 +55,6 @@ const generateCoverLetterForJob = async (req, res) => {
   }
 };
 
-// POST /api/documents/generate/:jobId
-// Generate both resume + cover letter for a specific job
 const generateBoth = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -89,8 +83,6 @@ const generateBoth = async (req, res) => {
   }
 };
 
-// GET /api/documents/resume/:jobId/download
-// Download resume as PDF
 const downloadResume = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -122,8 +114,6 @@ const downloadResume = async (req, res) => {
   }
 };
 
-// GET /api/documents/cover-letter/:jobId/download
-// Download cover letter as PDF
 const downloadCoverLetter = async (req, res) => {
   try {
     const userId = req.user.userId;

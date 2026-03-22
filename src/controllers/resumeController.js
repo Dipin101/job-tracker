@@ -4,15 +4,12 @@ const Anthropic = require("@anthropic-ai/sdk");
 
 const client = new Anthropic();
 
-//post api/resume/upload
 const uploadResume = async (req, res) => {
   try {
-    //file is uploaded
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    //extracting text from PDF
     const pdfData = await pdfParse(req.file.buffer);
     const rawText = pdfData.text;
 
@@ -22,7 +19,6 @@ const uploadResume = async (req, res) => {
         .json({ message: "Could not extract text from PDF" });
     }
 
-    //send to anthropic for skill extraction
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
@@ -38,14 +34,12 @@ const uploadResume = async (req, res) => {
       ],
     });
 
-    //parse skills from response
     const content = response.content[0].text;
-    const extractedSkills = JSON.parse(content);
+    const cleaned = content.replace(/```json|```/g, "").trim();
+    const extractedSkills = JSON.parse(cleaned);
 
-    //save to base_resume table
     const userId = req.user.userId;
 
-    //update if exist insert if not
     const result = await pool.query(
       `INSERT INTO base_resumes(user_id, file_url, raw_text, extracted_skills) VALUES($1,$2,$3,$4)
         ON CONFLICT(user_id) 
@@ -53,7 +47,7 @@ const uploadResume = async (req, res) => {
             raw_text = EXCLUDED.raw_text, 
             extracted_skills = EXCLUDED.extracted_skills, 
             uploaded_at = NOW()
-            RETURNING *`,
+        RETURNING *`,
       [userId, req.file.originalname, rawText, extractedSkills],
     );
     res.status(201).json({

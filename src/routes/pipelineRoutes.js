@@ -1,4 +1,3 @@
-// src/routes/pipelineRoutes.js
 const express = require("express");
 const router = express.Router();
 const pipelineService = require("../services/pipelineService");
@@ -24,7 +23,6 @@ router.post("/run", async (req, res) => {
     return res.status(400).json({ error: "userId is required" });
   }
 
-  // Set up SSE
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -43,11 +41,7 @@ router.post("/run", async (req, res) => {
   }
 });
 
-/**
- * GET /api/pipeline/results/:userId
- * Returns the latest pipeline run results (applied jobs) for display.
- */
-router.get("/results/:userId", async (req, res) => {
+router.get("/results", async (req, res) => {
   try {
     const results = await pipelineService.getLatestResults(req.user.userId);
     res.json(results);

@@ -12,7 +12,6 @@ const logger = winston.createLogger({
     }),
   ),
   transports: [
-    // Always log to console
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
@@ -21,7 +20,6 @@ const logger = winston.createLogger({
         }),
       ),
     }),
-    // Log errors to file in production
     new winston.transports.File({
       filename: "logs/error.log",
       level: "error",

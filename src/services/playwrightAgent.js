@@ -277,7 +277,7 @@ async function detectSuccess(page) {
       text.includes("successfully applied") ||
       text.includes("we received your application") ||
       text.includes("you've applied") ||
-      text.includes("you're response has been recorded") ||
+      text.includes("your response has been recorded") ||
       text.includes("thank you for completing") ||
       text.includes("successfully submitted") ||
       text.includes("form submitted")

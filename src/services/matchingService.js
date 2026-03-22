@@ -488,7 +488,6 @@ const scoreExperience = (userExpLevel = "entry", jobExpLevel = "") => {
 const scoreLocation = (userPrefs = {}, job = {}) => {
   const jobLoc = normalize(job.location || "");
   const userCity = normalize(userPrefs.city || "");
-  // const userRemote = userPrefs.remote_ok === true;
   const isRemote =
     jobLoc.includes("remote") ||
     job.remote === true ||

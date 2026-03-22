@@ -4,8 +4,6 @@ const {
   updateUserStatus,
 } = require("../services/applicationEngineService");
 
-// POST /api/engine/run
-// Run the full pipeline for the logged in user
 const runPipeline = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -28,8 +26,6 @@ const runPipeline = async (req, res) => {
   }
 };
 
-// POST /api/engine/retry
-// Process the retry queue manually
 const runRetryQueue = async (req, res) => {
   try {
     const processed = await processRetryQueue();
@@ -40,9 +36,6 @@ const runRetryQueue = async (req, res) => {
   }
 };
 
-// POST /api/engine/status
-// Update user job search status + kill switch
-// Body: { status: "active" | "paused" | "interviewing" | "employed" }
 const setStatus = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -55,7 +48,6 @@ const setStatus = async (req, res) => {
       });
     }
 
-    // employed = is_active false, everything else = true
     const isActive = status !== "employed";
     const user = await updateUserStatus(userId, status, isActive);
 

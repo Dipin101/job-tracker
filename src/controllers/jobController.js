@@ -1,8 +1,6 @@
 const db = require("../db/db");
 const { getLatestBatch, fetchAndStoreJobs } = require("../services/jobService");
 
-// GET /api/jobs
-// Paginated job list with optional filters
 const getJobs = async (req, res) => {
   try {
     const {
@@ -64,8 +62,6 @@ const getJobs = async (req, res) => {
   }
 };
 
-// GET /api/jobs/latest
-// Returns most recent cached batch from Redis (falls back to DB)
 const getLatestJobs = async (req, res) => {
   try {
     const jobs = await getLatestBatch();
@@ -76,8 +72,6 @@ const getLatestJobs = async (req, res) => {
   }
 };
 
-// GET /api/jobs/:id
-// Single job by UUID
 const getJobById = async (req, res) => {
   try {
     const result = await db.query("SELECT * FROM jobs WHERE id = $1", [
@@ -92,8 +86,6 @@ const getJobById = async (req, res) => {
   }
 };
 
-// POST /api/jobs/trigger
-// Manually trigger a job fetch — useful for testing without waiting for cron
 const triggerFetch = async (req, res) => {
   try {
     const { query = "software engineer" } = req.body;
