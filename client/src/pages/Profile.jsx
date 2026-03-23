@@ -19,6 +19,9 @@ const Profile = () => {
     match_threshold: 70,
     experience_level: "entry",
     country: "ca",
+    remote_ok: false,
+    preferred_companies: "",
+    blocked_companies: "",
   });
 
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,9 @@ const Profile = () => {
         match_threshold: u.match_threshold || 70,
         experience_level: u.experience_level || "entry",
         country: u.country || "ca",
+        remote_ok: u.remote_ok || false,
+        preferred_companies: u.preferred_companies?.join(", ") || "",
+        blocked_companies: u.blocked_companies?.join(", ") || "",
       });
     } catch (err) {
       console.error("Failed to fetch profile:", err);
@@ -58,7 +64,8 @@ const Profile = () => {
   };
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setForm({ ...form, [name]: type === "checkbox" ? checked : value });
   };
 
   const handleSubmit = async (e) => {
@@ -71,6 +78,14 @@ const Profile = () => {
         job_titles: form.job_titles
           .split(",")
           .map((t) => t.trim())
+          .filter(Boolean),
+        preferred_companies: form.preferred_companies
+          .split(",")
+          .map((c) => c.trim())
+          .filter(Boolean),
+        blocked_companies: form.blocked_companies
+          .split(",")
+          .map((c) => c.trim())
           .filter(Boolean),
         years_experience: parseInt(form.years_experience),
         salary_expectation_min: parseInt(form.salary_expectation_min) || null,
@@ -267,6 +282,7 @@ const Profile = () => {
                 />
               </div>
             </div>
+
             <div className="mt-4">
               <label className={labelClass}>Job Titles (comma separated)</label>
               <input
@@ -276,6 +292,66 @@ const Profile = () => {
                 className={inputClass}
                 placeholder="Junior Full Stack Developer, Junior Backend Developer"
               />
+            </div>
+
+            {/* Remote OK toggle */}
+            <div className="mt-4 flex items-center justify-between p-4 bg-gray-800 border border-gray-700 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-300">Remote OK</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Include remote positions in your job search
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, remote_ok: !form.remote_ok })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  form.remote_ok ? "bg-blue-600" : "bg-gray-600"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    form.remote_ok ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Company Preferences */}
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+            <h3 className="text-lg font-semibold mb-4">Company Preferences</h3>
+            <div className="space-y-4">
+              <div>
+                <label className={labelClass}>
+                  Preferred Companies (comma separated)
+                </label>
+                <input
+                  name="preferred_companies"
+                  value={form.preferred_companies}
+                  onChange={handleChange}
+                  className={inputClass}
+                  placeholder="Google, Shopify, Stripe"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  These companies get a scoring boost in matching
+                </p>
+              </div>
+              <div>
+                <label className={labelClass}>
+                  Blocked Companies (comma separated)
+                </label>
+                <input
+                  name="blocked_companies"
+                  value={form.blocked_companies}
+                  onChange={handleChange}
+                  className={inputClass}
+                  placeholder="Company A, Company B"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Jobs from these companies will be skipped entirely
+                </p>
+              </div>
             </div>
           </div>
 
