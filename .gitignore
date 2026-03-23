@@ -9,6 +9,9 @@ logs/
 src/services/testPlaywright.js
 src/services/mockData.js
 src/services/adzunaService.js
+src/services/joobleService.js
+src/services/arbeitNowService.js
+src/services/jobBankService.js
 
 #Log files
 logs/
@@ -20,4 +23,4 @@ error.log
 Thumbs.db
 .env.production
 AI Automation Tool docs.docx
-.seedMockjobs
+src/services/.seedMockjobs.js
