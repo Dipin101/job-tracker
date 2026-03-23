@@ -28,7 +28,7 @@ const Upload = () => {
       });
 
       setCvMessage(
-        `✓ CV uploaded — ${res.data.skills?.length || 0} skills extracted`,
+        `✓ CV uploaded — ${res.data.resume?.extracted_skills?.length || 0} skills extracted`,
       );
     } catch (err) {
       setCvMessage(`✗ ${err.response?.data?.message || "Upload failed"}`);
@@ -45,9 +45,9 @@ const Upload = () => {
     setGithubMessage("");
 
     try {
-      const res = await api.post("/github/connect", { githubUrl });
+      const res = await api.post("/github/connect", { github_url: githubUrl });
       setGithubMessage(
-        `✓ GitHub connected — ${res.data.skills?.length || 0} skills analyzed`,
+        `✓ GitHub connected — ${res.data.profile?.analyzed_skills?.length || 0} skills analyzed`,
       );
     } catch (err) {
       setGithubMessage(

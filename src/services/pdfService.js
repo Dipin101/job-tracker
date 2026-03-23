@@ -20,14 +20,7 @@ const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const MAX_Y = PAGE_HEIGHT - 45; // hard bottom boundary
 
 // Sections that never change size — always rendered fully at bottom
-const FIXED_SECTIONS = [
-  "EDUCATION",
-  "CERTIFICATES",
-  "CERTIFICATIONS",
-  "CERTIFICATE",
-  "REFERENCES",
-  "AWARDS",
-];
+const FIXED_SECTIONS = ["EDUCATION", "REFERENCES", "AWARDS"];
 
 // ── Section header ────────────────────────────────────────────────────────────
 const drawSectionHeader = (doc, title, y) => {

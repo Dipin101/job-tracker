@@ -115,7 +115,8 @@ JOB TITLE | Company | Location    Month Year – Month Year
 CRITICAL: Location must be the COUNTRY only — never city, state, or province ("Canada" not "Ontario, Canada", "United States" not "New York, NY", "Nepal" not "Sanepa, Nepal"). The entire left side MUST fit on one line.
 
 PROJECTS FORMAT (follow exactly):
-PROJECT NAME    Tech1 • Tech2 • Tech3 • Tech4 (max 4)    Year
+PROJECT NAME | Live Demo/GitHub Link    Year
+Tech1 • Tech2 • Tech3 • Tech4 (max 4)    
 - bullet
 - bullet
 
@@ -128,6 +129,15 @@ CRITICAL FOR PROJECT TECH STACK — always show strongest skills first:
 
 EDUCATION FORMAT:
 Degree | Institution    Year – Year
+
+CANDIDATE LINKS:
+- GitHub: ${user.github_url || ""}
+- Portfolio/Live Demo: ${user.portfolio_url || ""}
+
+When listing projects, include the relevant live demo or GitHub link next to the project name if available.
+- Job Tracker → use GitHub link
+- Habit Tracker → use portfolio/live demo link
+- Pomodoro → use GitHub link
 
 CANDIDATE SKILLS: ${allSkills.join(", ")}
 
