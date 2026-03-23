@@ -12,6 +12,7 @@ src/services/adzunaService.js
 src/services/joobleService.js
 src/services/arbeitNowService.js
 src/services/jobBankService.js
+src/services/indeedRSSService.js
 
 #Log files
 logs/

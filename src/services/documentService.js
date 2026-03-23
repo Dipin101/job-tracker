@@ -73,7 +73,7 @@ STEP 1 — ANALYSE THE JOB (do this mentally before writing):
 
 STEP 2 — TAILOR EVERY SECTION accordingly:
 - CAREER SUMMARY: 2-3 sentences that speak directly to what this job needs — mention their domain if relevant (fintech, consulting, SaaS etc). No generic openers.
-- TECHNICAL SKILLS: reorder so the most job-relevant skills appear first in each category
+- TECHNICAL SKILLS: reorder so the most job-relevant skills appear first in each category. Always include a Testing category with Vitest and React Testing Library separate from Tools & Practices.
 - WORK EXPERIENCE: for each role, lead bullets with the skills/outcomes this job cares about most. Same experience should be described differently for a React-heavy role vs a Node-heavy role vs a consulting role.
 - PROJECTS: feature the project most relevant to this job first. Describe it through the lens of what this job values.
 
@@ -129,6 +129,9 @@ CRITICAL FOR PROJECT TECH STACK — always show strongest skills first:
 
 EDUCATION FORMAT:
 Degree | Institution    Year – Year
+Keep institution names short — abbreviate if needed to fit one line
+Example: "Post-Graduate Certificate | Lambton College    2022 – 2024"
+NOT: "Post-Graduate Certificate | Full-Stack Software Development | Lambton College    2022 – 2024"
 
 CANDIDATE LINKS:
 - GitHub: ${user.github_url || ""}
