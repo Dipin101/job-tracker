@@ -30,8 +30,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * Title-level signals win — co-op/intern always entry regardless of description.
  */
 const inferExperienceLevel = (title = "", description = "") => {
-  const titleLower = title.toLowerCase();
-  const descLower = description.toLowerCase();
+  const titleLower = (title || "").toLowerCase();
+  const descLower = (description || "").toLowerCase();
 
   // Title-level entry signals — always win, no exceptions
   if (
@@ -176,7 +176,7 @@ const IRRELEVANT_TITLE_BLACKLIST = [
 ];
 
 const isRelevantJob = (title = "") => {
-  const t = title.toLowerCase();
+  const t = (title || "").toLowerCase();
   if (IRRELEVANT_TITLE_BLACKLIST.some((kw) => t.includes(kw))) return false;
   return RELEVANT_TITLE_KEYWORDS.some((kw) => t.includes(kw));
 };
