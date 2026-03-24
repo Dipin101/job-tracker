@@ -390,14 +390,20 @@ const saveJobs = async (jobs) => {
 
 // ── Deduplicate ───────────────────────────────────────────────────────────────
 const deduplicateJobs = (jobs) => {
-  const seen = new Set();
+  const seenIds = new Set();
+  const seenTitles = new Set();
+
   return jobs.filter((job) => {
-    if (seen.has(job.external_id)) return false;
-    seen.add(job.external_id);
+    if (seenIds.has(job.external_id)) return false;
+    seenIds.add(job.external_id);
+
+    const key = `${job.company.toLowerCase().trim()}||${job.title.toLowerCase().trim()}`;
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
+
     return true;
   });
 };
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 const main = async () => {
   console.log("\n===== Real Job Fetch Script =====");

@@ -59,7 +59,7 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await api.get("/matching/applications");
+      const res = await api.get("/matching/applications?limit=500");
       const apps = res.data.applications;
       setStats({
         total: apps.length,
