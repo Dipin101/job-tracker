@@ -36,6 +36,14 @@ const Dashboard = () => {
   useEffect(() => {
     fetchStats();
     fetchLatestJobs();
+
+    // Auto-refresh jobs + stats every 30s (catches cron runs)
+    const interval = setInterval(() => {
+      fetchStats();
+      fetchLatestJobs();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {

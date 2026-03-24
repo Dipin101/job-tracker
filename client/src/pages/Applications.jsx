@@ -2,11 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 
+const PAGE_SIZE = 10;
+
 const Applications = () => {
   const [applications, setApplications] = useState([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("newest");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -19,6 +22,11 @@ const Applications = () => {
     }, 30000);
     return () => clearInterval(intervalRef.current);
   }, []);
+
+  // Reset to page 1 whenever filter, search, or sort changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search, sort]);
 
   const fetchApplications = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -72,7 +80,7 @@ const Applications = () => {
   };
 
   // 1. Status filter
-  let result =
+  let filtered =
     filter === "all"
       ? applications
       : filter === "favourites"
@@ -82,7 +90,7 @@ const Applications = () => {
   // 2. Search — title or company
   if (search.trim()) {
     const q = search.toLowerCase();
-    result = result.filter(
+    filtered = filtered.filter(
       (a) =>
         a.title?.toLowerCase().includes(q) ||
         a.company?.toLowerCase().includes(q),
@@ -90,11 +98,15 @@ const Applications = () => {
   }
 
   // 3. Sort by date
-  result = [...result].sort((a, b) => {
+  filtered = [...filtered].sort((a, b) => {
     const dateA = new Date(a.apply_attempted_at || a.created_at || 0);
     const dateB = new Date(b.apply_attempted_at || b.created_at || 0);
     return sort === "newest" ? dateB - dateA : dateA - dateB;
   });
+
+  // 4. Paginate
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -105,9 +117,9 @@ const Applications = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">
             Applications
-            {result.length > 0 && (
+            {filtered.length > 0 && (
               <span className="ml-2 text-base font-normal text-gray-500">
-                ({result.length})
+                ({filtered.length})
               </span>
             )}
           </h2>
@@ -175,97 +187,160 @@ const Applications = () => {
 
         {loading ? (
           <p className="text-gray-400">Loading...</p>
-        ) : result.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <p className="text-gray-400">
             {search ? `No results for "${search}"` : "No applications found."}
           </p>
         ) : (
-          <div className="space-y-3">
-            {result.map((app) => (
-              <div
-                key={app.id}
-                className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-semibold text-white truncate">
-                      {app.title}
-                    </h3>
-                    {app.is_favourite && (
-                      <span className="text-pink-400 text-xs flex-shrink-0">
-                        ★ Favourite
-                      </span>
-                    )}
+          <>
+            <div className="space-y-3">
+              {paginated.map((app) => (
+                <div
+                  key={app.id}
+                  className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-semibold text-white truncate">
+                        {app.title}
+                      </h3>
+                      {app.is_favourite && (
+                        <span className="text-pink-400 text-xs flex-shrink-0">
+                          ★ Favourite
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-400 text-sm">
+                      {app.company} — {app.location}
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Match:{" "}
+                      {app.match_score != null ? `${app.match_score}%` : "N/A"}{" "}
+                      |{" "}
+                      {app.salary_min && app.salary_max
+                        ? `$${app.salary_min.toLocaleString()} – $${app.salary_max.toLocaleString()}`
+                        : "Salary not listed"}
+                      {app.apply_attempted_at && (
+                        <>
+                          {" "}
+                          |{" "}
+                          {new Date(app.apply_attempted_at).toLocaleDateString(
+                            "en-CA",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            },
+                          )}
+                        </>
+                      )}
+                    </p>
+                    <p className="text-gray-600 text-xs mt-1 line-clamp-1">
+                      {app.match_reasoning}
+                    </p>
                   </div>
-                  <p className="text-gray-400 text-sm">
-                    {app.company} — {app.location}
-                  </p>
-                  <p className="text-gray-500 text-xs mt-1">
-                    Match:{" "}
-                    {app.match_score != null ? `${app.match_score}%` : "N/A"} |{" "}
-                    {app.salary_min && app.salary_max
-                      ? `$${app.salary_min.toLocaleString()} – $${app.salary_max.toLocaleString()}`
-                      : "Salary not listed"}
-                    {app.apply_attempted_at && (
+
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                        statusColors[app.status] || statusColors.skipped
+                      }`}
+                    >
+                      {statusLabel[app.status] || app.status}
+                    </span>
+
+                    {["applied", "auto_applied", "manually_applied"].includes(
+                      app.status,
+                    ) && (
                       <>
-                        {" "}
-                        |{" "}
-                        {new Date(app.apply_attempted_at).toLocaleDateString(
-                          "en-CA",
-                          {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          },
-                        )}
+                        <button
+                          onClick={() => downloadDoc("resume", app.job_id)}
+                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
+                        >
+                          Resume
+                        </button>
+                        <button
+                          onClick={() =>
+                            downloadDoc("cover-letter", app.job_id)
+                          }
+                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
+                        >
+                          Cover Letter
+                        </button>
                       </>
                     )}
-                  </p>
-                  <p className="text-gray-600 text-xs mt-1 line-clamp-1">
-                    {app.match_reasoning}
-                  </p>
+
+                    <a
+                      href={app.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1 bg-blue-900/40 hover:bg-blue-800/40 border border-blue-800 rounded-lg text-xs text-blue-400 transition"
+                    >
+                      View Job
+                    </a>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm text-gray-300 transition"
+                >
+                  ← Prev
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(
+                      (p) =>
+                        p === 1 || p === totalPages || Math.abs(p - page) <= 1,
+                    )
+                    .reduce((acc, p, idx, arr) => {
+                      if (idx > 0 && p - arr[idx - 1] > 1) {
+                        acc.push("...");
+                      }
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, idx) =>
+                      p === "..." ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-2 text-gray-600 text-sm"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={`w-8 h-8 rounded-lg text-sm transition ${
+                            page === p
+                              ? "bg-blue-600 text-white"
+                              : "bg-gray-800 hover:bg-gray-700 text-gray-400"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ),
+                    )}
                 </div>
 
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                      statusColors[app.status] || statusColors.skipped
-                    }`}
-                  >
-                    {statusLabel[app.status] || app.status}
-                  </span>
-
-                  {["applied", "auto_applied", "manually_applied"].includes(
-                    app.status,
-                  ) && (
-                    <>
-                      <button
-                        onClick={() => downloadDoc("resume", app.job_id)}
-                        className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
-                      >
-                        Resume
-                      </button>
-                      <button
-                        onClick={() => downloadDoc("cover-letter", app.job_id)}
-                        className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
-                      >
-                        Cover Letter
-                      </button>
-                    </>
-                  )}
-
-                  <a
-                    href={app.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1 bg-blue-900/40 hover:bg-blue-800/40 border border-blue-800 rounded-lg text-xs text-blue-400 transition"
-                  >
-                    View Job
-                  </a>
-                </div>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm text-gray-300 transition"
+                >
+                  Next →
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
