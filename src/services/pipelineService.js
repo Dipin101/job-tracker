@@ -2,13 +2,16 @@
 const fetchRealJobs = require("../scripts/fetchRealJobs");
 const { processAllJobsForUser } = require("./applicationService");
 const applyService = require("./applyService");
-const db = require("../db/db"); // adjust to your db import
+const db = require("../db/db");
 
 /**
- * Runs the full pipeline for a user, emitting SSE progress events via `send`.
+ * Runs the full pipeline for a user.
+ * `send` is kept for internal logging — no longer used for SSE streaming.
+ * Returns a result object that the route sends as JSON.
  *
  * @param {string} userId
- * @param {function} send  - SSE emitter: send({ stage, status, message, data? })
+ * @param {function} send  - logger: send({ stage, status, message, data? })
+ * @returns {object} { fetchedCount, processed, autoApplied, manualRequired, failed, jobs }
  */
 const run = async (userId, send) => {
   // ─── Stage 1: Fetch jobs ───────────────────────────────────────────────────
@@ -81,12 +84,10 @@ const run = async (userId, send) => {
 
   let applyResults;
   try {
-    // applyService.run should accept a progress callback for per-job updates
     applyResults = await applyService.processAllMatched(
       userId,
       {},
       (jobUpdate) => {
-        // jobUpdate: { jobId, title, company, status, matchScore }
         send({
           stage: "apply",
           status: "running",
@@ -112,18 +113,17 @@ const run = async (userId, send) => {
   }
 
   // ─── Done ──────────────────────────────────────────────────────────────────
-  const appliedJobs = await getLatestResults(userId);
-  send({
-    stage: "done",
-    status: "complete",
-    message: "Pipeline complete",
-    data: {
-      fetchedCount,
-      ...matchResults,
-      ...applyResults,
-      jobs: appliedJobs,
-    },
-  });
+  send({ stage: "done", status: "complete", message: "Pipeline complete" });
+
+  const jobs = await getLatestResults(userId);
+
+  // Return the full result — the route will send this as JSON
+  return {
+    fetchedCount,
+    ...matchResults,
+    ...applyResults,
+    jobs,
+  };
 };
 
 /**

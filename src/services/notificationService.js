@@ -26,6 +26,17 @@ const sendMail = async ({ subject, html, attachments = [] }) => {
   if (error) throw new Error(error.message);
 };
 
+/**
+ * Normalise match_score to a display string.
+ * Handles: number (72), string ("72"), string ("72%"), null, undefined.
+ */
+const formatScore = (raw) => {
+  if (raw === null || raw === undefined || raw === "") return "N/A";
+  const num = parseFloat(String(raw).replace("%", ""));
+  if (isNaN(num)) return "N/A";
+  return `${Math.round(num)}%`;
+};
+
 // ─── Auto-applied successfully ────────────────────────────────────────────────
 const sendAppliedEmail = async (job) => {
   const subject = `✅ Auto-Applied: ${job.title} at ${job.company}`;
@@ -35,7 +46,7 @@ const sendAppliedEmail = async (job) => {
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Job Title</td><td>${job.title}</td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Company</td><td>${job.company}</td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Location</td><td>${job.location || "N/A"}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Match Score</td><td>${job.match_score ?? "N/A"}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Match Score</td><td>${formatScore(job.match_score)}</td></td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Applied Email</td><td>${process.env.JOB_EMAIL}</td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Time</td><td>${new Date().toLocaleString("en-CA", { timeZone: "America/Toronto" })}</td></tr>
     </table>
@@ -62,7 +73,7 @@ const sendManualRequiredEmail = async (
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Job Title</td><td>${job.title}</td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Company</td><td>${job.company}</td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Location</td><td>${job.location || "N/A"}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Match Score</td><td>${job.match_score ?? "N/A"}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Match Score</td><td>${formatScore(job.match_score)}</td></td></tr>
       <tr><td style="padding:6px 16px 6px 0;font-weight:bold;color:#374151">Apply Email</td><td>${process.env.JOB_EMAIL}</td></tr>
     </table>
     <p style="margin-top:20px;font-family:sans-serif">

@@ -20,6 +20,7 @@ const killSwitchColors = {
 };
 
 const STAGES = ["fetch", "match", "apply", "done"];
+const STAGE_CYCLE_MS = 4000;
 const Dashboard = () => {
   const { user, pipelineRunning, setPipelineRunning } = useAuth();
   const [status, setStatus] = useState("active");
@@ -30,14 +31,23 @@ const Dashboard = () => {
   const [pipelineStats, setPipelineStats] = useState(null);
   const [error, setError] = useState(null);
   const logRef = useRef(null);
+  const stageCycleRef = useRef(null);
 
   useEffect(() => {
     fetchStats();
+    fetchLatestJobs();
   }, []);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [log]);
+
+  // Cleanup stage cycling on unmount
+  useEffect(() => {
+    return () => {
+      if (stageCycleRef.current) clearInterval(stageCycleRef.current);
+    };
+  }, []);
 
   const fetchStats = async () => {
     try {
@@ -57,21 +67,64 @@ const Dashboard = () => {
     }
   };
 
+  // Fetch latest jobs from the last 24h to populate the jobs list on load
+  const fetchLatestJobs = async () => {
+    try {
+      const res = await api.get("/pipeline/results");
+      if (res.data?.length) setJobs(res.data);
+    } catch (err) {
+      console.error("Failed to fetch latest jobs:", err);
+    }
+  };
+
+  const addLog = (msg, type = "info") =>
+    setLog((prev) => [
+      ...prev,
+      { msg, type, ts: new Date().toLocaleTimeString() },
+    ]);
+
+  // Animates through fetch → match → apply while backend is running
+  const startStageCycle = () => {
+    const cycleStages = ["fetch", "match", "apply"];
+    let idx = 0;
+    setCurrentStage(cycleStages[0]);
+    addLog("Fetching fresh job listings…");
+
+    stageCycleRef.current = setInterval(() => {
+      idx = (idx + 1) % cycleStages.length;
+      setCurrentStage(cycleStages[idx]);
+      const msgs = {
+        fetch: "Fetching fresh job listings…",
+        match: "Scoring jobs against your profile…",
+        apply: "Generating documents & applying…",
+      };
+      addLog(msgs[cycleStages[idx]]);
+    }, STAGE_CYCLE_MS);
+  };
+
+  const stopStageCycle = () => {
+    if (stageCycleRef.current) {
+      clearInterval(stageCycleRef.current);
+      stageCycleRef.current = null;
+    }
+  };
+
   const runPipeline = async () => {
-    if (status === "employed" || status === "paused") return;
+    if (status === "employed" || status === "paused" || pipelineRunning) return;
 
     setPipelineRunning(true);
     setLog([]);
     setJobs([]);
     setPipelineStats(null);
     setError(null);
-    setCurrentStage("fetch");
 
-    const addLog = (msg, type = "info") =>
-      setLog((prev) => [
-        ...prev,
-        { msg, type, ts: new Date().toLocaleTimeString() },
-      ]);
+    startStageCycle();
+
+    // const addLog = (msg, type = "info") =>
+    //   setLog((prev) => [
+    //     ...prev,
+    //     { msg, type, ts: new Date().toLocaleTimeString() },
+    //   ]);
 
     try {
       const res = await fetch(
@@ -89,69 +142,95 @@ const Dashboard = () => {
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
+      // const reader = res.body.getReader();
+      // const decoder = new TextDecoder();
+      // let buf = "";
+      const data = await res.json();
+      stopStageCycle();
+      setCurrentStage("done");
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop();
+      addLog(`Fetched ${data.fetchedCount ?? 0} jobs`, "info");
+      addLog(`${data.processed ?? 0} jobs matched your threshold`, "info");
+      addLog(
+        `Applied to ${data.autoApplied ?? 0} jobs, ${data.manualRequired ?? 0} need manual review`,
+        "success",
+      );
+      addLog("Pipeline complete ✓", "success");
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const evt = JSON.parse(line.slice(6));
-            setCurrentStage(evt.stage);
-            addLog(
-              evt.message,
-              evt.status === "error"
-                ? "error"
-                : evt.status === "complete"
-                  ? "success"
-                  : "info",
-            );
+      setPipelineStats({
+        fetched: data.fetchedCount,
+        matched: data.processed,
+        autoApplied: data.autoApplied,
+        manualRequired: data.manualRequired,
+        failed: data.failed,
+      });
 
-            if (evt.stage === "apply" && evt.data?.jobId) {
-              setJobs((prev) => {
-                const exists = prev.find((j) => j.id === evt.data.jobId);
-                if (exists)
-                  return prev.map((j) =>
-                    j.id === evt.data.jobId ? { ...j, ...evt.data } : j,
-                  );
-                return [
-                  {
-                    id: evt.data.jobId,
-                    title: evt.data.title,
-                    company: evt.data.company,
-                    status: evt.data.status,
-                    match_score: evt.data.matchScore,
-                  },
-                  ...prev,
-                ];
-              });
-            }
+      if (data.jobs?.length) setJobs(data.jobs);
 
-            if (evt.stage === "done" && evt.data) {
-              setPipelineStats({
-                fetched: evt.data.fetchedCount,
-                matched: evt.data.processed,
-                autoApplied: evt.data.autoApplied,
-                manualRequired: evt.data.manualRequired,
-                failed: evt.data.failed,
-              });
-              if (evt.data.jobs?.length) setJobs(evt.data.jobs);
-              fetchStats();
-            }
-          } catch {
-            /* malformed SSE line */
-          }
-        }
-      }
+      // Refresh top-level stats
+      await fetchStats();
+      //   while (true) {
+      //     const { done, value } = await reader.read();
+      //     if (done) break;
+      //     buf += decoder.decode(value, { stream: true });
+      //     const lines = buf.split("\n");
+      //     buf = lines.pop();
+
+      //     for (const line of lines) {
+      //       if (!line.startsWith("data: ")) continue;
+      //       try {
+      //         const evt = JSON.parse(line.slice(6));
+      //         setCurrentStage(evt.stage);
+      //         addLog(
+      //           evt.message,
+      //           evt.status === "error"
+      //             ? "error"
+      //             : evt.status === "complete"
+      //               ? "success"
+      //               : "info",
+      //         );
+
+      //         if (evt.stage === "apply" && evt.data?.jobId) {
+      //           setJobs((prev) => {
+      //             const exists = prev.find((j) => j.id === evt.data.jobId);
+      //             if (exists)
+      //               return prev.map((j) =>
+      //                 j.id === evt.data.jobId ? { ...j, ...evt.data } : j,
+      //               );
+      //             return [
+      //               {
+      //                 id: evt.data.jobId,
+      //                 title: evt.data.title,
+      //                 company: evt.data.company,
+      //                 status: evt.data.status,
+      //                 match_score: evt.data.matchScore,
+      //               },
+      //               ...prev,
+      //             ];
+      //           });
+      //         }
+
+      //         if (evt.stage === "done" && evt.data) {
+      //           setPipelineStats({
+      //             fetched: evt.data.fetchedCount,
+      //             matched: evt.data.processed,
+      //             autoApplied: evt.data.autoApplied,
+      //             manualRequired: evt.data.manualRequired,
+      //             failed: evt.data.failed,
+      //           });
+      //           if (evt.data.jobs?.length) setJobs(evt.data.jobs);
+      //           fetchStats();
+      //         }
+      //       } catch {
+      //         /* malformed SSE line */
+      //       }
+      //     }
+      //   }
     } catch (err) {
+      stopStageCycle();
+      setCurrentStage(null);
       setError(err.message);
+      addLog(`Error: ${err.message}`, "error");
     } finally {
       setPipelineRunning(false);
     }
@@ -242,15 +321,18 @@ const Dashboard = () => {
             applies automatically.
           </p>
 
-          <button
-            onClick={runPipeline}
-            disabled={pipelineDisabled}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-semibold transition"
-          >
-            {pipelineLabel}
-          </button>
+          {/* Button — hidden while running, shown otherwise */}
+          {!pipelineRunning && (
+            <button
+              onClick={runPipeline}
+              disabled={pipelineDisabled}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 rounded-lg font-semibold transition"
+            >
+              {pipelineLabel}
+            </button>
+          )}
 
-          {/* Stage progress bar */}
+          {/* Stage progress bar — shown while running or after done */}
           {(pipelineRunning || currentStage) && (
             <div className="mt-6">
               <div className="flex items-center gap-0 mb-4">
@@ -315,6 +397,13 @@ const Dashboard = () => {
                   <span className="text-xs text-gray-600">Starting…</span>
                 )}
               </div>
+
+              {/* Running indicator */}
+              {pipelineRunning && (
+                <p className="text-xs text-blue-400 mt-3 animate-pulse">
+                  Pipeline is running — this may take a few minutes…
+                </p>
+              )}
             </div>
           )}
 
@@ -383,7 +472,13 @@ const Dashboard = () => {
                     <div className="flex items-center gap-3 flex-shrink-0">
                       {job.match_score != null && (
                         <span
-                          className={`text-sm font-semibold ${job.match_score >= 70 ? "text-green-400" : job.match_score >= 55 ? "text-yellow-400" : "text-gray-400"}`}
+                          className={`text-sm font-semibold ${
+                            job.match_score >= 70
+                              ? "text-green-400"
+                              : job.match_score >= 55
+                                ? "text-yellow-400"
+                                : "text-gray-400"
+                          }`}
                         >
                           {job.match_score}%
                         </span>

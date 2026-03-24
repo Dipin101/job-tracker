@@ -132,16 +132,22 @@ const processApplication = async (jobId, userId) => {
   );
 
   // ── 6. Send notification ────────────────────────────────────────────────────
+  const { rows: scoreRows } = await db.query(
+    `SELECT match_score FROM applications WHERE id = $1`,
+    [applicationId],
+  );
+  const match_score = scoreRows[0]?.match_score ?? null;
+
   let notificationSent = false;
   try {
     if (status === "auto_applied") {
       await notificationService.sendAppliedEmail({
         ...job,
-        match_score: job.match_score,
+        match_score,
       });
     } else if (status === "manual_required") {
       await notificationService.sendManualRequiredEmail(
-        { ...job, user_id: userId, match_score: job.match_score },
+        { ...job, user_id: userId, match_score: match_score },
         reason,
       );
     }

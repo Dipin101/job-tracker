@@ -23,22 +23,37 @@ router.post("/run", async (req, res) => {
     return res.status(400).json({ error: "userId is required" });
   }
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders();
+  //   res.setHeader("Content-Type", "text/event-stream");
+  //   res.setHeader("Cache-Control", "no-cache");
+  //   res.setHeader("Connection", "keep-alive");
+  //   res.setHeader("X-Accel-Buffering", "no");
+  //   res.flushHeaders();
 
+  //   const send = (payload) => {
+  //     res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  //   };
+
+  //   try {
+  //     await pipelineService.run(userId, send);
+  //   } catch (err) {
+  //     send({ stage: "error", status: "error", message: err.message });
+  //   } finally {
+  //     res.end();
+  //   }*/
+
+  // Collect log messages server-side (no streaming needed)
+  const logs = [];
   const send = (payload) => {
-    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    logs.push(payload);
+    console.log(`[Pipeline] [${payload.stage}] ${payload.message}`);
   };
 
   try {
-    await pipelineService.run(userId, send);
+    const result = await pipelineService.run(userId, send);
+    return res.json({ ...result, logs });
   } catch (err) {
-    send({ stage: "error", status: "error", message: err.message });
-  } finally {
-    res.end();
+    console.error("[Pipeline] Fatal error:", err.message);
+    return res.status(500).json({ error: err.message, logs });
   }
 });
 

@@ -29,9 +29,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * Improved experience level detection.
  * Title-level signals win — co-op/intern always entry regardless of description.
  */
+const SENIOR_TITLE_BLOCKLIST =
+  /\bsenior\b|\bsr\b|\bsr\.\b|\blead\b|\bprincipal\b|\bstaff\b|\barchitect\b|\bdirector\b|\bvp\b|\bmanager\b|\bhead of\b|\bvice president\b|[5-9]\+\s*years|10\+\s*years/i;
+const isSeniorTitle = (title = "") => SENIOR_TITLE_BLOCKLIST.test(title);
+
 const inferExperienceLevel = (title = "", description = "") => {
   const titleLower = (title || "").toLowerCase();
   const descLower = (description || "").toLowerCase();
+
+  //Hard check for seniors
+  if (isSeniorTitle(title)) return "senior";
 
   // Title-level entry signals — always win, no exceptions
   if (
@@ -51,8 +58,8 @@ const inferExperienceLevel = (title = "", description = "") => {
 
   // Senior — title or description
   if (
-    (titleLower + " " + descLower).match(
-      /\bsenior\b|\blead\b|\bprincipal\b|\bstaff\b|architect|director|\bvp\b|vice president|head of|\bmanager\b/,
+    descLower.match(
+      /\b5\+\s*years|\b6\+\s*years|\b7\+\s*years|\b8\+\s*years|\b10\+\s*years|5[\s\-]to[\s\-]10\s*years|5[\s\-]10\s*years/,
     )
   )
     return "senior";
@@ -61,7 +68,7 @@ const inferExperienceLevel = (title = "", description = "") => {
 };
 
 const filterRecent = (jobs) => {
-  const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // 2 days
+  const cutoff = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000); // 1 days
   return jobs.filter((job) => new Date(job.posted_at) >= cutoff);
 };
 
@@ -181,6 +188,24 @@ const isRelevantJob = (title = "") => {
   return RELEVANT_TITLE_KEYWORDS.some((kw) => t.includes(kw));
 };
 
+// ── Hard post-filter — drops any job that slips through with a senior title ───
+const isEntryOrMidLevel = (job) => {
+  if (isSeniorTitle(job.title)) {
+    console.log(
+      `[Filter] Dropped senior title: "${job.title}" @ ${job.company}`,
+    );
+    return false;
+  }
+  // Also drop if experience_level was inferred as senior
+  if (job.experience_level === "senior") {
+    console.log(
+      `[Filter] Dropped senior level: "${job.title}" @ ${job.company}`,
+    );
+    return false;
+  }
+  return true;
+};
+
 // ── 1. Adzuna ─────────────────────────────────────────────────────────────────
 const fetchAdzuna = async (query, country, results = 50) => {
   const appId = process.env.ADZUNA_APP_ID;
@@ -274,9 +299,10 @@ const fetchJSearch = async (query, country) => {
       let experienceLevel;
 
       if (expMonths !== null && expMonths !== undefined) {
-        if (expMonths <= 12) experienceLevel = "entry";
+        if (expMonths >= 60) experienceLevel = "senior";
+        else if (expMonths <= 12) experienceLevel = "entry";
         else if (expMonths <= 36) experienceLevel = "mid";
-        else experienceLevel = "senior";
+        else experienceLevel = "senior"; // 37–59
       } else {
         // Fall back to text inference if no structured data
         experienceLevel = inferExperienceLevel(
@@ -419,7 +445,7 @@ const main = async () => {
   for (const query of jsearchQueries) {
     const jobs = await fetchJSearch(query, COUNTRY);
     allJobs.push(...jobs);
-    await sleep(2000); // slightly longer delay — RapidAPI rate limits
+    await sleep(2000); // slightly longer delay — apI rate limits
   }
 
   // ── Dedup + filter + save ─────────────────────────────────────────────────
@@ -428,16 +454,23 @@ const main = async () => {
   const unique = deduplicateJobs(allJobs);
   const recent = filterRecent(unique);
 
-  console.log(`After dedup + 2-day filter: ${recent.length} jobs\n`);
+  // ── Hard post-filter: drop any senior titles that slipped through ──────────
+  const entryMidOnly = recent.filter(isEntryOrMidLevel);
+  const seniorDropped = recent.length - entryMidOnly.length;
 
-  if (recent.length === 0) {
+  console.log(`After dedup + 1-day filter: ${recent.length} jobs\n`);
+  console.log(
+    `After senior title filter: ${entryMidOnly.length} jobs (dropped ${seniorDropped} senior roles)\n`,
+  );
+
+  if (entryMidOnly.length === 0) {
     console.log("No jobs found. Check your API keys and country setting.");
     // process.exit(0);
     return 0;
   }
 
-  const { saved, skipped } = await saveJobs(recent);
-  console.log(`\n✅ Saved: ${saved} | Skipped (duplicates): ${skipped}`);
+  const { saved, skipped } = await saveJobs(entryMidOnly);
+  console.log(`\nSaved: ${saved} | Skipped (duplicates): ${skipped}`);
 
   // ── Summary ───────────────────────────────────────────────────────────────
   const bySource = await db.query(

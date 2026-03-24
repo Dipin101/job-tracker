@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 
@@ -6,19 +6,34 @@ const Applications = () => {
   const [applications, setApplications] = useState([]);
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
     fetchApplications();
+
+    // Auto-refresh every 30 seconds
+    intervalRef.current = setInterval(() => {
+      fetchApplications(true); // silent refresh
+    }, 30000);
+
+    return () => clearInterval(intervalRef.current);
   }, []);
 
-  const fetchApplications = async () => {
+  const fetchApplications = async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
+
     try {
       const res = await api.get("/matching/applications?limit=50");
       setApplications(res.data.applications);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error("Failed to fetch applications:", err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -40,9 +55,22 @@ const Applications = () => {
 
   const statusColors = {
     applied: "bg-green-900/40 text-green-400 border-green-800",
+    auto_applied: "bg-green-900/40 text-green-400 border-green-800",
+    manually_applied: "bg-purple-900/40 text-purple-400 border-purple-800",
+    manual_required: "bg-yellow-900/40 text-yellow-400 border-yellow-800",
     pending: "bg-yellow-900/40 text-yellow-400 border-yellow-800",
     skipped: "bg-gray-800 text-gray-500 border-gray-700",
     failed: "bg-red-900/40 text-red-400 border-red-800",
+  };
+
+  const statusLabel = {
+    auto_applied: "Auto-applied",
+    manually_applied: "Manual",
+    manual_required: "Needs review",
+    pending: "Pending",
+    skipped: "Skipped",
+    failed: "Failed",
+    applied: "Applied",
   };
 
   const filtered =
@@ -54,15 +82,39 @@ const Applications = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Navbar */}
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-6 py-10">
-        <h2 className="text-2xl font-bold mb-6">Applications</h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Applications</h2>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-gray-500">
+                Updated {lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={() => fetchApplications(true)}
+              disabled={refreshing}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-lg text-xs text-gray-300 transition flex items-center gap-1.5"
+            >
+              <span className={refreshing ? "animate-spin" : ""}>↻</span>
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+        </div>
 
         {/* Filters */}
         <div className="flex gap-2 mb-6 flex-wrap">
-          {["all", "applied", "pending", "skipped", "favourites"].map((f) => (
+          {[
+            "all",
+            "applied",
+            "auto_applied",
+            "manual_required",
+            "pending",
+            "skipped",
+            "favourites",
+          ].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -72,7 +124,7 @@ const Applications = () => {
                   : "bg-transparent border-gray-700 text-gray-400 hover:border-gray-500"
               }`}
             >
-              {f}
+              {statusLabel[f] || f}
             </button>
           ))}
         </div>
@@ -99,7 +151,8 @@ const Applications = () => {
                     {app.company} — {app.location}
                   </p>
                   <p className="text-gray-500 text-xs mt-1">
-                    Match: {app.match_score}% |{" "}
+                    Match:{" "}
+                    {app.match_score != null ? `${app.match_score}%` : "N/A"} |{" "}
                     {app.salary_min && app.salary_max
                       ? `$${app.salary_min.toLocaleString()} – $${app.salary_max.toLocaleString()}`
                       : "Salary not listed"}
@@ -115,10 +168,12 @@ const Applications = () => {
                       statusColors[app.status] || statusColors.skipped
                     }`}
                   >
-                    {app.status}
+                    {statusLabel[app.status] || app.status}
                   </span>
 
-                  {app.status === "applied" && (
+                  {["applied", "auto_applied", "manually_applied"].includes(
+                    app.status,
+                  ) && (
                     <>
                       <button
                         onClick={() => downloadDoc("resume", app.job_id)}
