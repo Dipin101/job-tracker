@@ -56,7 +56,7 @@ const login = async (req, res) => {
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
 
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); //-> 7 days 7days + 24 hour* 60minute * 60seconds * 1000ms
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await pool.query(
       "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1,$2, $3)",
       [user.id, refreshToken, expiresAt],
@@ -121,7 +121,12 @@ const logout = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id, email, full_name, phone, location, work_authorization, years_experience, salary_expectation_min, salary_expectation_max, linkedin_url, portfolio_url, bio_summary, job_titles, match_threshold, experience_level, country, job_search_status, is_active FROM users WHERE id = $1",
+      `SELECT id, email, full_name, phone, location, work_authorization,
+              years_experience, salary_expectation_min, salary_expectation_max,
+              linkedin_url, portfolio_url, bio_summary, job_titles, match_threshold,
+              experience_level, country, job_search_status, is_active,
+              remote_ok, preferred_companies, blocked_companies
+       FROM users WHERE id = $1`,
       [req.user.userId],
     );
     return res.json({ user: result.rows[0] });
@@ -148,6 +153,9 @@ const updateProfile = async (req, res) => {
       match_threshold,
       experience_level,
       country,
+      remote_ok,
+      preferred_companies,
+      blocked_companies,
     } = req.body;
 
     const result = await pool.query(
@@ -155,9 +163,11 @@ const updateProfile = async (req, res) => {
         full_name = $1, phone = $2, location = $3, work_authorization = $4,
         years_experience = $5, salary_expectation_min = $6, salary_expectation_max = $7,
         linkedin_url = $8, portfolio_url = $9, bio_summary = $10,
-        job_titles = $11, match_threshold = $12, experience_level = $13, country = $14
-       WHERE id = $15
-       RETURNING id, email, full_name, experience_level, country, match_threshold`,
+        job_titles = $11, match_threshold = $12, experience_level = $13, country = $14,
+        remote_ok = $15, preferred_companies = $16, blocked_companies = $17
+       WHERE id = $18
+       RETURNING id, email, full_name, experience_level, country, match_threshold,
+                 remote_ok, preferred_companies, blocked_companies`,
       [
         full_name,
         phone,
@@ -173,6 +183,9 @@ const updateProfile = async (req, res) => {
         match_threshold,
         experience_level,
         country,
+        remote_ok,
+        preferred_companies,
+        blocked_companies,
         req.user.userId,
       ],
     );
