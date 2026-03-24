@@ -76,7 +76,7 @@ const Dashboard = () => {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/pipeline/run`,
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/pipeline/run`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
