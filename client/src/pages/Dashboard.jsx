@@ -79,7 +79,11 @@ const Dashboard = () => {
         `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/pipeline/run`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+          credentials: "include",
           body: JSON.stringify({ userId: user?.id }),
         },
       );
