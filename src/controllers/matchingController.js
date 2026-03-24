@@ -125,4 +125,51 @@ const getApplications = async (req, res) => {
   }
 };
 
-module.exports = { runMatching, matchSingleJob, getMySkills, getApplications };
+const updateApplication = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    const validStatuses = [
+      "manually_applied",
+      "rejected",
+      "skipped",
+      "manual_required",
+    ];
+
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+      });
+    }
+
+    const { rows } = await db.query(
+      `UPDATE applications
+       SET
+         status = COALESCE($1, status),
+         notes  = COALESCE($2, notes),
+         updated_at = NOW()
+       WHERE id = $3 AND user_id = $4
+       RETURNING *`,
+      [status || null, notes || null, id, userId],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    return res.json({ application: rows[0] });
+  } catch (err) {
+    console.error("[MatchingController] updateApplication error:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = {
+  runMatching,
+  matchSingleJob,
+  getMySkills,
+  getApplications,
+  updateApplication,
+};

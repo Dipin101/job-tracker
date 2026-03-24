@@ -13,6 +13,10 @@ const Applications = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
+  // Track which app has the notes input open + its draft note value
+  const [notesOpen, setNotesOpen] = useState({}); // { [appId]: true }
+  const [notesDraft, setNotesDraft] = useState({}); // { [appId]: string }
+  const [saving, setSaving] = useState({}); // { [appId]: true }
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -23,7 +27,6 @@ const Applications = () => {
     return () => clearInterval(intervalRef.current);
   }, []);
 
-  // Reset to page 1 whenever filter, search, or sort changes
   useEffect(() => {
     setPage(1);
   }, [filter, search, sort]);
@@ -40,6 +43,27 @@ const Applications = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  // Patch a single application — updates locally without full refresh
+  const updateApp = async (appId, payload) => {
+    setSaving((prev) => ({ ...prev, [appId]: true }));
+    try {
+      const res = await api.patch(`/matching/applications/${appId}`, payload);
+      const updated = res.data.application;
+      setApplications((prev) =>
+        prev.map((a) => (a.id === appId ? { ...a, ...updated } : a)),
+      );
+      // Close notes panel if we just saved notes
+      if (payload.notes !== undefined) {
+        setNotesOpen((prev) => ({ ...prev, [appId]: false }));
+      }
+    } catch (err) {
+      console.error("Failed to update application:", err);
+      alert("Failed to save — please try again");
+    } finally {
+      setSaving((prev) => ({ ...prev, [appId]: false }));
     }
   };
 
@@ -67,16 +91,18 @@ const Applications = () => {
     pending: "bg-yellow-900/40 text-yellow-400 border-yellow-800",
     skipped: "bg-gray-800 text-gray-500 border-gray-700",
     failed: "bg-red-900/40 text-red-400 border-red-800",
+    rejected: "bg-red-900/40 text-red-400 border-red-800",
   };
 
   const statusLabel = {
     auto_applied: "Auto-applied",
-    manually_applied: "Manual",
+    manually_applied: "Applied",
     manual_required: "Needs review",
     pending: "Pending",
     skipped: "Skipped",
     failed: "Failed",
     applied: "Applied",
+    rejected: "Rejected",
   };
 
   // 1. Status filter
@@ -167,6 +193,8 @@ const Applications = () => {
             "all",
             "auto_applied",
             "manual_required",
+            "manually_applied",
+            "rejected",
             "pending",
             "skipped",
             "favourites",
@@ -194,93 +222,191 @@ const Applications = () => {
         ) : (
           <>
             <div className="space-y-3">
-              {paginated.map((app) => (
-                <div
-                  key={app.id}
-                  className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-white truncate">
-                        {app.title}
-                      </h3>
-                      {app.is_favourite && (
-                        <span className="text-pink-400 text-xs flex-shrink-0">
-                          ★ Favourite
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-400 text-sm">
-                      {app.company} — {app.location}
-                    </p>
-                    <p className="text-gray-500 text-xs mt-1">
-                      Match:{" "}
-                      {app.match_score != null ? `${app.match_score}%` : "N/A"}{" "}
-                      |{" "}
-                      {app.salary_min && app.salary_max
-                        ? `$${app.salary_min.toLocaleString()} – $${app.salary_max.toLocaleString()}`
-                        : "Salary not listed"}
-                      {app.apply_attempted_at && (
-                        <>
-                          {" "}
-                          |{" "}
-                          {new Date(app.apply_attempted_at).toLocaleDateString(
-                            "en-CA",
-                            {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            },
+              {paginated.map((app) => {
+                const isManual = app.status === "manual_required";
+                const isSavingThis = saving[app.id];
+                const noteOpen = notesOpen[app.id];
+                const draft = notesDraft[app.id] ?? app.notes ?? "";
+
+                return (
+                  <div
+                    key={app.id}
+                    className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-3"
+                  >
+                    {/* Main row */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-semibold text-white truncate">
+                            {app.title}
+                          </h3>
+                          {app.is_favourite && (
+                            <span className="text-pink-400 text-xs flex-shrink-0">
+                              ★ Favourite
+                            </span>
                           )}
-                        </>
-                      )}
-                    </p>
-                    <p className="text-gray-600 text-xs mt-1 line-clamp-1">
-                      {app.match_reasoning}
-                    </p>
-                  </div>
+                        </div>
+                        <p className="text-gray-400 text-sm">
+                          {app.company} — {app.location}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          Match:{" "}
+                          {app.match_score != null
+                            ? `${app.match_score}%`
+                            : "N/A"}{" "}
+                          |{" "}
+                          {app.salary_min && app.salary_max
+                            ? `$${app.salary_min.toLocaleString()} – $${app.salary_max.toLocaleString()}`
+                            : "Salary not listed"}
+                          {app.apply_attempted_at && (
+                            <>
+                              {" "}
+                              |{" "}
+                              {new Date(
+                                app.apply_attempted_at,
+                              ).toLocaleDateString("en-CA", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </>
+                          )}
+                        </p>
+                        <p className="text-gray-600 text-xs mt-1 line-clamp-1">
+                          {app.match_reasoning}
+                        </p>
+                        {/* Show saved note if exists */}
+                        {app.notes && !noteOpen && (
+                          <p className="text-gray-500 text-xs mt-1 italic">
+                            📝 {app.notes}
+                          </p>
+                        )}
+                      </div>
 
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                        statusColors[app.status] || statusColors.skipped
-                      }`}
-                    >
-                      {statusLabel[app.status] || app.status}
-                    </span>
-
-                    {["applied", "auto_applied", "manually_applied"].includes(
-                      app.status,
-                    ) && (
-                      <>
-                        <button
-                          onClick={() => downloadDoc("resume", app.job_id)}
-                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
+                      <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                            statusColors[app.status] || statusColors.skipped
+                          }`}
                         >
-                          Resume
+                          {statusLabel[app.status] || app.status}
+                        </span>
+
+                        {/* Manual required actions */}
+                        {isManual && (
+                          <>
+                            <button
+                              onClick={() =>
+                                updateApp(app.id, {
+                                  status: "manually_applied",
+                                })
+                              }
+                              disabled={isSavingThis}
+                              className="px-3 py-1 bg-green-900/40 hover:bg-green-800/50 border border-green-800 text-green-400 rounded-lg text-xs transition disabled:opacity-50"
+                            >
+                              ✓ Applied
+                            </button>
+                            <button
+                              onClick={() =>
+                                updateApp(app.id, { status: "rejected" })
+                              }
+                              disabled={isSavingThis}
+                              className="px-3 py-1 bg-red-900/40 hover:bg-red-800/50 border border-red-800 text-red-400 rounded-lg text-xs transition disabled:opacity-50"
+                            >
+                              ✕ Reject
+                            </button>
+                            <button
+                              onClick={() =>
+                                setNotesOpen((prev) => ({
+                                  ...prev,
+                                  [app.id]: !noteOpen,
+                                }))
+                              }
+                              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 rounded-lg text-xs transition"
+                            >
+                              📝 Note
+                            </button>
+                          </>
+                        )}
+
+                        {/* Doc downloads for applied statuses */}
+                        {[
+                          "applied",
+                          "auto_applied",
+                          "manually_applied",
+                        ].includes(app.status) && (
+                          <>
+                            <button
+                              onClick={() => downloadDoc("resume", app.job_id)}
+                              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
+                            >
+                              Resume
+                            </button>
+                            <button
+                              onClick={() =>
+                                downloadDoc("cover-letter", app.job_id)
+                              }
+                              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
+                            >
+                              Cover Letter
+                            </button>
+                          </>
+                        )}
+
+                        <a
+                          href={app.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1 bg-blue-900/40 hover:bg-blue-800/40 border border-blue-800 rounded-lg text-xs text-blue-400 transition"
+                        >
+                          View Job
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Inline notes panel — only for manual_required */}
+                    {isManual && noteOpen && (
+                      <div className="flex gap-2 mt-1">
+                        <input
+                          type="text"
+                          value={draft}
+                          onChange={(e) =>
+                            setNotesDraft((prev) => ({
+                              ...prev,
+                              [app.id]: e.target.value,
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter")
+                              updateApp(app.id, { notes: draft });
+                          }}
+                          placeholder="e.g. Too much experience, French required…"
+                          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-600 transition"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => updateApp(app.id, { notes: draft })}
+                          disabled={isSavingThis}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg text-xs text-white transition"
+                        >
+                          {isSavingThis ? "Saving…" : "Save"}
                         </button>
                         <button
                           onClick={() =>
-                            downloadDoc("cover-letter", app.job_id)
+                            setNotesOpen((prev) => ({
+                              ...prev,
+                              [app.id]: false,
+                            }))
                           }
-                          className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs transition"
+                          className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-gray-400 transition"
                         >
-                          Cover Letter
+                          Cancel
                         </button>
-                      </>
+                      </div>
                     )}
-
-                    <a
-                      href={app.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-1 bg-blue-900/40 hover:bg-blue-800/40 border border-blue-800 rounded-lg text-xs text-blue-400 transition"
-                    >
-                      View Job
-                    </a>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Pagination */}
@@ -301,9 +427,7 @@ const Applications = () => {
                         p === 1 || p === totalPages || Math.abs(p - page) <= 1,
                     )
                     .reduce((acc, p, idx, arr) => {
-                      if (idx > 0 && p - arr[idx - 1] > 1) {
-                        acc.push("...");
-                      }
+                      if (idx > 0 && p - arr[idx - 1] > 1) acc.push("...");
                       acc.push(p);
                       return acc;
                     }, [])
