@@ -5,6 +5,8 @@ import Navbar from "../components/Navbar";
 const Applications = () => {
   const [applications, setApplications] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("newest");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -12,21 +14,17 @@ const Applications = () => {
 
   useEffect(() => {
     fetchApplications();
-
-    // Auto-refresh every 30 seconds
     intervalRef.current = setInterval(() => {
-      fetchApplications(true); // silent refresh
+      fetchApplications(true);
     }, 30000);
-
     return () => clearInterval(intervalRef.current);
   }, []);
 
   const fetchApplications = async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
-
     try {
-      const res = await api.get("/matching/applications?limit=50");
+      const res = await api.get("/matching/applications?limit=200");
       setApplications(res.data.applications);
       setLastUpdated(new Date());
     } catch (err) {
@@ -73,20 +71,46 @@ const Applications = () => {
     applied: "Applied",
   };
 
-  const filtered =
+  // 1. Status filter
+  let result =
     filter === "all"
       ? applications
       : filter === "favourites"
         ? applications.filter((a) => a.is_favourite)
         : applications.filter((a) => a.status === filter);
 
+  // 2. Search — title or company
+  if (search.trim()) {
+    const q = search.toLowerCase();
+    result = result.filter(
+      (a) =>
+        a.title?.toLowerCase().includes(q) ||
+        a.company?.toLowerCase().includes(q),
+    );
+  }
+
+  // 3. Sort by date
+  result = [...result].sort((a, b) => {
+    const dateA = new Date(a.apply_attempted_at || a.created_at || 0);
+    const dateB = new Date(b.apply_attempted_at || b.created_at || 0);
+    return sort === "newest" ? dateB - dateA : dateA - dateB;
+  });
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Applications</h2>
+          <h2 className="text-2xl font-bold">
+            Applications
+            {result.length > 0 && (
+              <span className="ml-2 text-base font-normal text-gray-500">
+                ({result.length})
+              </span>
+            )}
+          </h2>
           <div className="flex items-center gap-3">
             {lastUpdated && (
               <span className="text-xs text-gray-500">
@@ -98,17 +122,37 @@ const Applications = () => {
               disabled={refreshing}
               className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-lg text-xs text-gray-300 transition flex items-center gap-1.5"
             >
-              <span className={refreshing ? "animate-spin" : ""}>↻</span>
+              <span className={refreshing ? "animate-spin inline-block" : ""}>
+                ↻
+              </span>
               {refreshing ? "Refreshing…" : "Refresh"}
             </button>
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Search + Sort */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title or company…"
+            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-600 transition"
+          />
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-blue-600 transition"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </select>
+        </div>
+
+        {/* Status filters */}
         <div className="flex gap-2 mb-6 flex-wrap">
           {[
             "all",
-            "applied",
             "auto_applied",
             "manual_required",
             "pending",
@@ -118,7 +162,7 @@ const Applications = () => {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition border ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition border ${
                 filter === f
                   ? "bg-blue-600 border-transparent text-white"
                   : "bg-transparent border-gray-700 text-gray-400 hover:border-gray-500"
@@ -131,20 +175,26 @@ const Applications = () => {
 
         {loading ? (
           <p className="text-gray-400">Loading...</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-gray-400">No applications found.</p>
+        ) : result.length === 0 ? (
+          <p className="text-gray-400">
+            {search ? `No results for "${search}"` : "No applications found."}
+          </p>
         ) : (
           <div className="space-y-3">
-            {filtered.map((app) => (
+            {result.map((app) => (
               <div
                 key={app.id}
                 className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-semibold text-white">{app.title}</h3>
+                    <h3 className="font-semibold text-white truncate">
+                      {app.title}
+                    </h3>
                     {app.is_favourite && (
-                      <span className="text-pink-400 text-xs">★ Favourite</span>
+                      <span className="text-pink-400 text-xs flex-shrink-0">
+                        ★ Favourite
+                      </span>
                     )}
                   </div>
                   <p className="text-gray-400 text-sm">
@@ -156,6 +206,20 @@ const Applications = () => {
                     {app.salary_min && app.salary_max
                       ? `$${app.salary_min.toLocaleString()} – $${app.salary_max.toLocaleString()}`
                       : "Salary not listed"}
+                    {app.apply_attempted_at && (
+                      <>
+                        {" "}
+                        |{" "}
+                        {new Date(app.apply_attempted_at).toLocaleDateString(
+                          "en-CA",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          },
+                        )}
+                      </>
+                    )}
                   </p>
                   <p className="text-gray-600 text-xs mt-1 line-clamp-1">
                     {app.match_reasoning}
@@ -164,7 +228,7 @@ const Applications = () => {
 
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium border capitalize ${
+                    className={`px-3 py-1 rounded-full text-xs font-medium border ${
                       statusColors[app.status] || statusColors.skipped
                     }`}
                   >
