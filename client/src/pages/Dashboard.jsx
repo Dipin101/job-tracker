@@ -20,7 +20,6 @@ const killSwitchColors = {
 };
 
 const STAGES = ["fetch", "match", "apply", "done"];
-
 const Dashboard = () => {
   const { user, pipelineRunning, setPipelineRunning } = useAuth();
   const [status, setStatus] = useState("active");
@@ -158,6 +157,7 @@ const Dashboard = () => {
     }
   };
 
+  //updating status
   const updateStatus = async (newStatus) => {
     try {
       await api.post("/engine/status", { status: newStatus });
