@@ -223,7 +223,7 @@ const fetchAdzuna = async (query, country, results = 50) => {
         app_key: appKey,
         what: query,
         results_per_page: results,
-        max_days_old: 2,
+        max_days_old: 1,
         sort_by: "date",
       },
       timeout: 30000,
@@ -248,9 +248,15 @@ const fetchAdzuna = async (query, country, results = 50) => {
       salary_max: job.salary_max ? Math.round(job.salary_max) : null,
       experience_level: inferExperienceLevel(job.title, job.description),
       required_skills: [],
-      posted_at: job.created
-        ? new Date(job.created).toISOString()
-        : new Date().toISOString(),
+      posted_at: (() => {
+        if (!job.created) {
+          console.log(
+            `[Adzuna] No created date for: ${job.title} @ ${job.company?.display_name} — skipping`,
+          );
+          return null; // mark as null so we can filter it out
+        }
+        return new Date(job.created).toISOString();
+      })(),
     }));
   } catch (err) {
     console.error(`[Adzuna] Error: ${err.response?.status} — ${err.message}`);
@@ -461,7 +467,9 @@ const main = async () => {
   const recent = filterRecent(unique);
 
   // ── Hard post-filter: drop any senior titles that slipped through ──────────
-  const entryMidOnly = recent.filter(isEntryOrMidLevel);
+  const entryMidOnly = recent
+    .filter(isEntryOrMidLevel)
+    .filter((j) => j.posted_at !== null);
   const seniorDropped = recent.length - entryMidOnly.length;
 
   console.log(`After dedup + 1-day filter: ${recent.length} jobs\n`);
