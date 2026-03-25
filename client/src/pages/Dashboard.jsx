@@ -21,6 +21,7 @@ const killSwitchColors = {
 
 const STAGES = ["fetch", "match", "apply", "done"];
 const STAGE_CYCLE_MS = 4000;
+
 const Dashboard = () => {
   const { user, pipelineRunning, setPipelineRunning } = useAuth();
   const [status, setStatus] = useState("active");
@@ -30,17 +31,21 @@ const Dashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [pipelineStats, setPipelineStats] = useState(null);
   const [error, setError] = useState(null);
+  const [cronRunning, setCronRunning] = useState(false); // cron awareness
   const logRef = useRef(null);
   const stageCycleRef = useRef(null);
+  const pipelineRunningRef = useRef(false);
+  const cronRunningRef = useRef(false);
 
   useEffect(() => {
     fetchStats();
     fetchLatestJobs();
+    checkPipelineStatus();
 
-    // Auto-refresh jobs + stats every 30s (catches cron runs)
     const interval = setInterval(() => {
       fetchStats();
       fetchLatestJobs();
+      checkPipelineStatus();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -50,12 +55,41 @@ const Dashboard = () => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [log]);
 
-  // Cleanup stage cycling on unmount
   useEffect(() => {
     return () => {
       if (stageCycleRef.current) clearInterval(stageCycleRef.current);
     };
   }, []);
+
+  // ── Check if cron is running in background ──────────────────────────────────
+  const checkPipelineStatus = async () => {
+    try {
+      const res = await api.get("/pipeline/status");
+      const running = res.data.running;
+
+      if (running && !pipelineRunningRef.current) {
+        // cron just started — show it in UI
+        pipelineRunningRef.current = true;
+        cronRunningRef.current = true;
+        setCronRunning(true);
+        setPipelineRunning(true);
+        startStageCycle(true);
+      } else if (!running && cronRunningRef.current) {
+        // cron just finished — refresh results
+        pipelineRunningRef.current = false;
+        cronRunningRef.current = false;
+        setCronRunning(false);
+        setPipelineRunning(false);
+        stopStageCycle();
+        setCurrentStage("done");
+        addLog("Cron pipeline completed ✓", "success");
+        await fetchStats();
+        await fetchLatestJobs();
+      }
+    } catch (err) {
+      console.error("Failed to check pipeline status:", err);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -75,7 +109,6 @@ const Dashboard = () => {
     }
   };
 
-  // Fetch latest jobs from the last 24h to populate the jobs list on load
   const fetchLatestJobs = async () => {
     try {
       const res = await api.get("/pipeline/results");
@@ -91,12 +124,15 @@ const Dashboard = () => {
       { msg, type, ts: new Date().toLocaleTimeString() },
     ]);
 
-  // Animates through fetch → match → apply while backend is running
-  const startStageCycle = () => {
+  const startStageCycle = (isCron = false) => {
     const cycleStages = ["fetch", "match", "apply"];
     let idx = 0;
     setCurrentStage(cycleStages[0]);
-    addLog("Fetching fresh job listings…");
+    addLog(
+      isCron
+        ? "Cron pipeline started automatically…"
+        : "Fetching fresh job listings…",
+    );
 
     stageCycleRef.current = setInterval(() => {
       idx = (idx + 1) % cycleStages.length;
@@ -119,20 +155,16 @@ const Dashboard = () => {
 
   const runPipeline = async () => {
     if (status === "employed" || status === "paused" || pipelineRunning) return;
-
+    pipelineRunningRef.current = true;
+    cronRunningRef.current = false;
     setPipelineRunning(true);
+    setCronRunning(false);
     setLog([]);
     setJobs([]);
     setPipelineStats(null);
     setError(null);
 
-    startStageCycle();
-
-    // const addLog = (msg, type = "info") =>
-    //   setLog((prev) => [
-    //     ...prev,
-    //     { msg, type, ts: new Date().toLocaleTimeString() },
-    //   ]);
+    startStageCycle(false);
 
     try {
       const res = await fetch(
@@ -150,9 +182,6 @@ const Dashboard = () => {
 
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
 
-      // const reader = res.body.getReader();
-      // const decoder = new TextDecoder();
-      // let buf = "";
       const data = await res.json();
       stopStageCycle();
       setCurrentStage("done");
@@ -174,77 +203,18 @@ const Dashboard = () => {
       });
 
       if (data.jobs?.length) setJobs(data.jobs);
-
-      // Refresh top-level stats
       await fetchStats();
-      //   while (true) {
-      //     const { done, value } = await reader.read();
-      //     if (done) break;
-      //     buf += decoder.decode(value, { stream: true });
-      //     const lines = buf.split("\n");
-      //     buf = lines.pop();
-
-      //     for (const line of lines) {
-      //       if (!line.startsWith("data: ")) continue;
-      //       try {
-      //         const evt = JSON.parse(line.slice(6));
-      //         setCurrentStage(evt.stage);
-      //         addLog(
-      //           evt.message,
-      //           evt.status === "error"
-      //             ? "error"
-      //             : evt.status === "complete"
-      //               ? "success"
-      //               : "info",
-      //         );
-
-      //         if (evt.stage === "apply" && evt.data?.jobId) {
-      //           setJobs((prev) => {
-      //             const exists = prev.find((j) => j.id === evt.data.jobId);
-      //             if (exists)
-      //               return prev.map((j) =>
-      //                 j.id === evt.data.jobId ? { ...j, ...evt.data } : j,
-      //               );
-      //             return [
-      //               {
-      //                 id: evt.data.jobId,
-      //                 title: evt.data.title,
-      //                 company: evt.data.company,
-      //                 status: evt.data.status,
-      //                 match_score: evt.data.matchScore,
-      //               },
-      //               ...prev,
-      //             ];
-      //           });
-      //         }
-
-      //         if (evt.stage === "done" && evt.data) {
-      //           setPipelineStats({
-      //             fetched: evt.data.fetchedCount,
-      //             matched: evt.data.processed,
-      //             autoApplied: evt.data.autoApplied,
-      //             manualRequired: evt.data.manualRequired,
-      //             failed: evt.data.failed,
-      //           });
-      //           if (evt.data.jobs?.length) setJobs(evt.data.jobs);
-      //           fetchStats();
-      //         }
-      //       } catch {
-      //         /* malformed SSE line */
-      //       }
-      //     }
-      //   }
     } catch (err) {
       stopStageCycle();
       setCurrentStage(null);
       setError(err.message);
       addLog(`Error: ${err.message}`, "error");
     } finally {
+      pipelineRunningRef.current = false;
       setPipelineRunning(false);
     }
   };
 
-  //updating status
   const updateStatus = async (newStatus) => {
     try {
       await api.post("/engine/status", { status: newStatus });
@@ -258,7 +228,9 @@ const Dashboard = () => {
   const pipelineDisabled =
     pipelineRunning || status === "employed" || status === "paused";
   const pipelineLabel = pipelineRunning
-    ? "Running..."
+    ? cronRunning
+      ? "Cron running…"
+      : "Running..."
     : status === "employed"
       ? "Disabled (employed)"
       : status === "paused"
@@ -312,16 +284,23 @@ const Dashboard = () => {
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Run Pipeline</h2>
-            {status === "paused" && (
-              <span className="text-xs text-yellow-400 border border-yellow-800 rounded px-2 py-1">
-                Paused
-              </span>
-            )}
-            {status === "interviewing" && (
-              <span className="text-xs text-blue-400 border border-blue-800 rounded px-2 py-1">
-                Interviewing mode
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {cronRunning && (
+                <span className="text-xs text-blue-400 border border-blue-800 rounded px-2 py-1 animate-pulse">
+                  Cron running
+                </span>
+              )}
+              {status === "paused" && (
+                <span className="text-xs text-yellow-400 border border-yellow-800 rounded px-2 py-1">
+                  Paused
+                </span>
+              )}
+              {status === "interviewing" && (
+                <span className="text-xs text-blue-400 border border-blue-800 rounded px-2 py-1">
+                  Interviewing mode
+                </span>
+              )}
+            </div>
           </div>
 
           <p className="text-gray-400 text-sm mb-4">
@@ -329,7 +308,6 @@ const Dashboard = () => {
             applies automatically.
           </p>
 
-          {/* Button — hidden while running, shown otherwise */}
           {!pipelineRunning && (
             <button
               onClick={runPipeline}
@@ -340,7 +318,6 @@ const Dashboard = () => {
             </button>
           )}
 
-          {/* Stage progress bar — shown while running or after done */}
           {(pipelineRunning || currentStage) && (
             <div className="mt-6">
               <div className="flex items-center gap-0 mb-4">
@@ -374,13 +351,13 @@ const Dashboard = () => {
                   );
                 })}
               </div>
+
               <div className="flex justify-between text-xs text-gray-500 px-1 mb-4">
                 {["Fetch", "Match", "Apply", "Done"].map((l) => (
                   <span key={l}>{l}</span>
                 ))}
               </div>
 
-              {/* Live log */}
               <div
                 ref={logRef}
                 className="bg-gray-950 border border-gray-800 rounded-lg p-3 max-h-32 overflow-y-auto flex flex-col gap-1"
@@ -406,10 +383,11 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {/* Running indicator */}
               {pipelineRunning && (
                 <p className="text-xs text-blue-400 mt-3 animate-pulse">
-                  Pipeline is running — this may take a few minutes…
+                  {cronRunning
+                    ? "Cron pipeline is running in the background…"
+                    : "Pipeline is running — this may take a few minutes…"}
                 </p>
               )}
             </div>
@@ -417,7 +395,6 @@ const Dashboard = () => {
 
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
 
-          {/* Pipeline summary stats */}
           {pipelineStats && (
             <div className="grid grid-cols-5 gap-3 mt-5">
               {[
@@ -459,7 +436,9 @@ const Dashboard = () => {
         {jobs.length > 0 && (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-6">
             <h2 className="text-lg font-semibold mb-4">
-              This run — {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+              {cronRunning
+                ? "Background run — live results"
+                : `This run — ${jobs.length} job${jobs.length !== 1 ? "s" : ""}`}
             </h2>
             <div className="flex flex-col gap-3">
               {jobs.map((job) => {

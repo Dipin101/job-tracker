@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pipelineService = require("../services/pipelineService");
 const auth = require("../middleware/auth");
+const { isRunningNow } = require("../services/pipelineService");
 
 router.use(auth);
 /**
@@ -55,6 +56,10 @@ router.post("/run", async (req, res) => {
     console.error("[Pipeline] Fatal error:", err.message);
     return res.status(500).json({ error: err.message, logs });
   }
+});
+
+router.get("/status", async (req, res) => {
+  res.json({ running: isRunningNow() });
 });
 
 router.get("/results", async (req, res) => {

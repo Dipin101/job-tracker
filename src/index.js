@@ -23,7 +23,8 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 // ── Rate limiting ──────────────────────────────────────────────────────────
-app.use("/api/", apiLimiter);
+// app.use("/api/", apiLimiter); --> globally
+// app.use("/api(?!auth)", apiLimiter); //excludes auth --> doessn't work well with express
 // ── Routes ──────────────────────────────────────────────────────────────
 const authRoutes = require("./routes/authRoutes");
 const resumeRoutes = require("./routes/resumeRoutes");
@@ -35,13 +36,13 @@ const engineRoutes = require("./routes/applicationEngineRoutes");
 const applyRoutes = require("./routes/applyRoutes");
 const pipelineRoutes = require("./routes/pipelineRoutes");
 app.use("/api/auth", authRoutes);
-app.use("/api/resume", resumeRoutes);
-app.use("/api/github", githubRoutes);
-app.use("/api/jobs", jobRoutes);
-app.use("/api/matching", matchingRoutes);
-app.use("/api/documents", documentRoutes);
+app.use("/api/resume", apiLimiter, resumeRoutes);
+app.use("/api/github", apiLimiter, githubRoutes);
+app.use("/api/jobs", apiLimiter, jobRoutes);
+app.use("/api/matching", apiLimiter, matchingRoutes);
+app.use("/api/documents", apiLimiter, documentRoutes);
 app.use("/api/engine", pipelineLimiter, engineRoutes);
-app.use("/api/apply", applyRoutes);
+app.use("/api/apply", apiLimiter, applyRoutes);
 app.use("/api/pipeline", pipelineLimiter, pipelineRoutes);
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
