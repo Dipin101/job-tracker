@@ -297,13 +297,11 @@ const Applications = () => {
                   "auto_applied",
                   "manually_applied",
                 ].includes(app.status);
-                const isPreApply = [
-                  "pending",
-                  "manual_required",
-                  "skipped",
-                  "failed",
-                ].includes(app.status);
                 const isManual = app.status === "manual_required";
+                // "Not interested" only for undecided states — NOT for manual_required (already has a CTA)
+                const canDismiss = ["pending", "skipped", "failed"].includes(
+                  app.status,
+                );
 
                 const postedDate = app.posted_at
                   ? new Date(app.posted_at).toLocaleDateString("en-CA", {
@@ -414,8 +412,36 @@ const Applications = () => {
                       <div className="border-t border-gray-800 px-5 py-4 flex flex-col gap-5">
                         {/* ── Action buttons (status-driven) ── */}
                         <div className="flex flex-wrap gap-2">
-                          {/* PRE-APPLY: not yet applied — let them dismiss */}
-                          {isPreApply && (
+                          {/* MANUAL REQUIRED: read description, then decide */}
+                          {isManual && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  updateApp(app.id, {
+                                    status: "manually_applied",
+                                  })
+                                }
+                                disabled={isSavingThis}
+                                className="px-3 py-1.5 bg-green-900/40 hover:bg-green-800/50 border border-green-800 text-green-400 rounded-lg text-xs transition disabled:opacity-50"
+                              >
+                                ✓ Mark as Applied
+                              </button>
+                              <button
+                                onClick={() =>
+                                  updateApp(app.id, {
+                                    status: "not_interested",
+                                  })
+                                }
+                                disabled={isSavingThis}
+                                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 rounded-lg text-xs transition disabled:opacity-50"
+                              >
+                                Not interested
+                              </button>
+                            </>
+                          )}
+
+                          {/* PENDING / SKIPPED / FAILED: can only dismiss */}
+                          {canDismiss && (
                             <button
                               onClick={() =>
                                 updateApp(app.id, { status: "not_interested" })
@@ -424,21 +450,6 @@ const Applications = () => {
                               className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-400 rounded-lg text-xs transition disabled:opacity-50"
                             >
                               Not interested
-                            </button>
-                          )}
-
-                          {/* MANUAL REQUIRED: let them mark as applied */}
-                          {isManual && (
-                            <button
-                              onClick={() =>
-                                updateApp(app.id, {
-                                  status: "manually_applied",
-                                })
-                              }
-                              disabled={isSavingThis}
-                              className="px-3 py-1.5 bg-green-900/40 hover:bg-green-800/50 border border-green-800 text-green-400 rounded-lg text-xs transition disabled:opacity-50"
-                            >
-                              ✓ Mark as Applied
                             </button>
                           )}
 
@@ -498,7 +509,7 @@ const Applications = () => {
                           )}
                         </div>
 
-                        {/* - Notes — always available - */}
+                        {/* ── Notes — always available ── */}
                         <div>
                           <p className="text-xs font-medium text-gray-400 mb-1.5">
                             Notes
@@ -580,23 +591,28 @@ const Applications = () => {
                         </div>
 
                         {/* ── Job description ── */}
-                        {app.description && (
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs font-medium text-gray-400">
-                                Job description
-                              </p>
-                              {postedDate && (
-                                <span className="text-xs text-gray-600">
-                                  Posted {postedDate}
-                                </span>
-                              )}
-                            </div>
-                            <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-4 py-3 max-h-64 overflow-y-auto">
-                              <JobDescription text={app.description} />
-                            </div>
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-medium text-gray-400">
+                              Job description
+                            </p>
+                            {postedDate && (
+                              <span className="text-xs text-gray-600">
+                                Posted {postedDate}
+                              </span>
+                            )}
                           </div>
-                        )}
+                          <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-4 py-3 max-h-64 overflow-y-auto">
+                            {app.description ? (
+                              <JobDescription text={app.description} />
+                            ) : (
+                              <p className="text-xs text-gray-600 italic">
+                                No description available — view the job posting
+                                directly for details.
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
