@@ -498,7 +498,7 @@ const Applications = () => {
                           )}
                         </div>
 
-                        {/* ── Notes — always available ── */}
+                        {/* - Notes — always available - */}
                         <div>
                           <p className="text-xs font-medium text-gray-400 mb-1.5">
                             Notes
