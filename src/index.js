@@ -48,7 +48,7 @@ app.use("/api/matching", apiLimiter, matchingRoutes);
 app.use("/api/documents", apiLimiter, documentRoutes);
 app.use("/api/engine", pipelineLimiter, engineRoutes);
 app.use("/api/apply", apiLimiter, applyRoutes);
-app.use("/api/pipeline", pipelineLimiter, pipelineRoutes);
+app.use("/api/pipeline", pipelineRoutes);
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
