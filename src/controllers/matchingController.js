@@ -109,7 +109,7 @@ const getApplications = async (req, res) => {
     }
 
     const result = await db.query(
-      `SELECT a.*, j.title, j.company, j.location, j.url, j.salary_min, j.salary_max
+      `SELECT a.*, j.title, j.company, j.location, j.url, j.salary_min, j.salary_max, j.description, j.posted_at
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE ${conditions.join(" AND ")}
@@ -136,6 +136,9 @@ const updateApplication = async (req, res) => {
       "rejected",
       "skipped",
       "manual_required",
+      "not_interested",
+      "first_call",
+      "interviewing",
     ];
 
     if (status && !validStatuses.includes(status)) {
