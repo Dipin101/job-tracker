@@ -391,22 +391,6 @@ const Applications = () => {
                         >
                           {statusLabel[app.status] || app.status}
                         </span>
-                        {/* ★ Favourite toggle */}
-                        <button
-                          onClick={() =>
-                            updateApp(app.id, {
-                              is_favourite: !app.is_favourite,
-                            })
-                          }
-                          disabled={isSavingThis}
-                          className={`text-base leading-none transition disabled:opacity-50 ${
-                            app.is_favourite
-                              ? "text-pink-400 hover:text-pink-300"
-                              : "text-gray-600 hover:text-gray-400"
-                          }`}
-                        >
-                          ★
-                        </button>
 
                         <a
                           href={app.url}
