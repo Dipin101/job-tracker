@@ -32,7 +32,6 @@ const statusLabel = {
   first_call: "First call",
 };
 
-// Formats raw job description text into readable sections
 const JobDescription = ({ text }) => {
   if (!text) return null;
 
@@ -42,21 +41,17 @@ const JobDescription = ({ text }) => {
 
   while (i < lines.length) {
     const line = lines[i].trim();
-
     if (!line) {
       i++;
       continue;
     }
 
-    // Detect section header: short line ending with ":" or all-caps word(s)
     const isHeader =
       (line.endsWith(":") && line.length < 80) ||
       (line === line.toUpperCase() &&
         line.length > 3 &&
         line.length < 60 &&
         /[A-Z]/.test(line));
-
-    // Detect bullet point
     const isBullet = /^[-•*]\s/.test(line) || /^\d+\.\s/.test(line);
 
     if (isHeader) {
@@ -85,7 +80,6 @@ const JobDescription = ({ text }) => {
         </p>,
       );
     }
-
     i++;
   }
 
@@ -151,7 +145,8 @@ const Applications = () => {
     await updateApp(appId, { notes: note });
   };
 
-  const downloadDoc = async (type, jobId) => {
+  // Downloads resume or cover letter with company name in filename
+  const downloadDoc = async (type, jobId, company) => {
     try {
       const res = await api.get(`/documents/${type}/${jobId}/download`, {
         responseType: "blob",
@@ -159,7 +154,11 @@ const Applications = () => {
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${type}-${jobId}.pdf`;
+      const companySlug = (company || "company")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      a.download = `${type}-${companySlug}.pdf`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
@@ -187,11 +186,21 @@ const Applications = () => {
     );
   }
 
-  filtered = [...filtered].sort((a, b) => {
-    const dateA = new Date(a.apply_attempted_at || a.created_at || 0);
-    const dateB = new Date(b.apply_attempted_at || b.created_at || 0);
-    return sort === "newest" ? dateB - dateA : dateA - dateB;
-  });
+  // Sort / filter by date
+  if (sort === "today") {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    filtered = filtered.filter((a) => {
+      const date = new Date(a.apply_attempted_at || a.created_at || 0);
+      return date >= todayStart;
+    });
+  } else {
+    filtered = [...filtered].sort((a, b) => {
+      const dateA = new Date(a.apply_attempted_at || a.created_at || 0);
+      const dateB = new Date(b.apply_attempted_at || b.created_at || 0);
+      return sort === "newest" ? dateB - dateA : dateA - dateB;
+    });
+  }
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -245,6 +254,7 @@ const Applications = () => {
           >
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
+            <option value="today">Today only</option>
           </select>
         </div>
 
@@ -281,7 +291,11 @@ const Applications = () => {
           <p className="text-gray-400">Loading...</p>
         ) : filtered.length === 0 ? (
           <p className="text-gray-400">
-            {search ? `No results for "${search}"` : "No applications found."}
+            {sort === "today"
+              ? "No applications from today yet."
+              : search
+                ? `No results for "${search}"`
+                : "No applications found."}
           </p>
         ) : (
           <>
@@ -291,14 +305,12 @@ const Applications = () => {
                 const isSavingThis = saving[app.id];
                 const draft = notesDraft[app.id] ?? app.notes ?? "";
 
-                // Status groups drive which actions show
                 const isApplied = [
                   "applied",
                   "auto_applied",
                   "manually_applied",
                 ].includes(app.status);
                 const isManual = app.status === "manual_required";
-                // "Not interested" only for undecided states — NOT for manual_required (already has a CTA)
                 const canDismiss = ["pending", "skipped", "failed"].includes(
                   app.status,
                 );
@@ -322,7 +334,7 @@ const Applications = () => {
                     key={app.id}
                     className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
                   >
-                    {/* Card header — click to expand */}
+                    {/* Card header */}
                     <div
                       className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-800/30 transition"
                       onClick={() => toggleExpand(app.id)}
@@ -381,7 +393,6 @@ const Applications = () => {
                         )}
                       </div>
 
-                      {/* Right side: status badge + job link + chevron — stop propagation so clicks don't expand */}
                       <div
                         className="flex items-center gap-2 flex-shrink-0 flex-wrap"
                         onClick={(e) => e.stopPropagation()}
@@ -391,6 +402,22 @@ const Applications = () => {
                         >
                           {statusLabel[app.status] || app.status}
                         </span>
+
+                        <button
+                          onClick={() =>
+                            updateApp(app.id, {
+                              is_favourite: !app.is_favourite,
+                            })
+                          }
+                          disabled={isSavingThis}
+                          className={`text-base leading-none transition disabled:opacity-50 ${
+                            app.is_favourite
+                              ? "text-pink-400 hover:text-pink-300"
+                              : "text-gray-600 hover:text-gray-400"
+                          }`}
+                        >
+                          ★
+                        </button>
 
                         <a
                           href={app.url}
@@ -410,9 +437,8 @@ const Applications = () => {
                     {/* Expanded panel */}
                     {isExpanded && (
                       <div className="border-t border-gray-800 px-5 py-4 flex flex-col gap-5">
-                        {/* ── Action buttons (status-driven) ── */}
+                        {/* Action buttons */}
                         <div className="flex flex-wrap gap-2">
-                          {/* MANUAL REQUIRED: read description, then decide */}
                           {isManual && (
                             <>
                               <button
@@ -440,7 +466,6 @@ const Applications = () => {
                             </>
                           )}
 
-                          {/* PENDING / SKIPPED / FAILED: can only dismiss */}
                           {canDismiss && (
                             <button
                               onClick={() =>
@@ -453,7 +478,6 @@ const Applications = () => {
                             </button>
                           )}
 
-                          {/* POST-APPLY: track what happened */}
                           {isApplied && (
                             <>
                               <button
@@ -486,12 +510,11 @@ const Applications = () => {
                             </>
                           )}
 
-                          {/* Resume + Cover Letter downloads — shown for applied and manual_required */}
                           {(isApplied || isManual) && (
                             <>
                               <button
                                 onClick={() =>
-                                  downloadDoc("resume", app.job_id)
+                                  downloadDoc("resume", app.job_id, app.company)
                                 }
                                 className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg text-xs transition flex items-center gap-1"
                               >
@@ -499,7 +522,11 @@ const Applications = () => {
                               </button>
                               <button
                                 onClick={() =>
-                                  downloadDoc("cover-letter", app.job_id)
+                                  downloadDoc(
+                                    "cover-letter",
+                                    app.job_id,
+                                    app.company,
+                                  )
                                 }
                                 className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 rounded-lg text-xs transition flex items-center gap-1"
                               >
@@ -509,7 +536,7 @@ const Applications = () => {
                           )}
                         </div>
 
-                        {/* ── Notes — always available ── */}
+                        {/* Notes */}
                         <div>
                           <p className="text-xs font-medium text-gray-400 mb-1.5">
                             Notes
@@ -540,7 +567,7 @@ const Applications = () => {
                           </div>
                         </div>
 
-                        {/* ── AI reasoning ── */}
+                        {/* AI reasoning */}
                         {app.match_reasoning && (
                           <div>
                             <p className="text-xs font-medium text-gray-400 mb-1">
@@ -552,7 +579,7 @@ const Applications = () => {
                           </div>
                         )}
 
-                        {/* ── Skills ── */}
+                        {/* Skills */}
                         <div className="flex gap-6 flex-wrap">
                           {app.matched_skills?.length > 0 && (
                             <div>
@@ -590,7 +617,7 @@ const Applications = () => {
                           )}
                         </div>
 
-                        {/* ── Job description ── */}
+                        {/* Job description */}
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs font-medium text-gray-400">
