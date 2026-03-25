@@ -132,35 +132,7 @@ const processApplication = async (jobId, userId) => {
   );
 
   // ── 6. Send notification ────────────────────────────────────────────────────
-  const { rows: scoreRows } = await db.query(
-    `SELECT match_score FROM applications WHERE id = $1`,
-    [applicationId],
-  );
-  const match_score = scoreRows[0]?.match_score ?? null;
-
-  let notificationSent = false;
-  try {
-    if (status === "auto_applied") {
-      await notificationService.sendAppliedEmail({
-        ...job,
-        match_score,
-      });
-    } else if (status === "manual_required") {
-      await notificationService.sendManualRequiredEmail(
-        { ...job, user_id: userId, match_score: match_score },
-        reason,
-      );
-    }
-    notificationSent = true;
-  } catch (err) {
-    console.error(`[ApplyService] Notification failed: ${err.message}`);
-  }
-
-  // ── 7. Flip notification_sent in DB ─────────────────────────────────────────
-  await db.query(
-    `UPDATE applications SET notification_sent = $1 WHERE id = $2`,
-    [notificationSent, applicationId],
-  );
+  // notifications are sent as daily digest at end of run, not per job
 
   return { status, job, applicationId, fields };
 };
@@ -238,7 +210,7 @@ const processAllMatched = async (
 
   // ── Send Weekly digest ───────────────────────────────────────────────────────
   try {
-    await notificationService.sendWeeklyDigest(results);
+    await notificationService.sendDailyDigest(results);
   } catch (err) {
     console.error(`[ApplyService] Digest notification failed: ${err.message}`);
   }

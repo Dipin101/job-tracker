@@ -20,7 +20,7 @@ const getThresholds = (experienceLevel) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// USER SKILLS
+// USER SKILLS — called once per pipeline run, not per job
 // ─────────────────────────────────────────────────────────────────────────────
 const getUserSkills = async (userId) => {
   const [cvResult, githubResult] = await Promise.all([
@@ -160,18 +160,7 @@ const EXPERIENCE_SCALE = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PRE-FILTER
-// Kills obviously irrelevant jobs BEFORE any scoring or API calls.
-// Saves computation time and Anthropic API credits.
-//
-// Logic:
-//   1. Always skip — completely unrelated fields regardless of level
-//   2. Check for rescue signals — "junior", "willing to train", "mentorship" etc
-//      If found → always score, rescue signals override everything
-//   3. No rescue signals → skip if senior title OR 2+ years experience required
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Fields that are NEVER relevant for a full stack / web dev candidate
-// No matter what the level says, these are always skipped
 const ALWAYS_IRRELEVANT_TITLES = [
   "ios developer",
   "android developer",
@@ -225,8 +214,6 @@ const ALWAYS_IRRELEVANT_TITLES = [
   "electrical engineer",
 ];
 
-// Rescue signals — if ANY of these appear in title OR description,
-// score the job regardless of experience requirement or seniority
 const RESCUE_SIGNALS = [
   "junior",
   "entry level",
@@ -270,7 +257,6 @@ const RESCUE_SIGNALS = [
   "junior/mid",
 ];
 
-// Senior title keywords — skip if no rescue signal
 const SENIOR_TITLE_WORDS = [
   "senior ",
   " sr.",
@@ -294,70 +280,49 @@ const SENIOR_TITLE_WORDS = [
   "engineering manager",
 ];
 
-/**
- * Pre-filter — returns { skip: boolean, reason: string }
- * Called before any scoring to eliminate obviously irrelevant jobs.
- */
+const normalize = (str = "") => str.toLowerCase().trim();
+
 const shouldSkipJob = (job, userExpLevel = "entry") => {
   const titleNorm = normalize(job.title || "");
   const descNorm = normalize((job.description || "").slice(0, 1000));
   const fullText = titleNorm + " " + descNorm;
 
-  // ── 1. Always irrelevant fields — skip immediately, no rescue ────────────
   if (ALWAYS_IRRELEVANT_TITLES.some((kw) => titleNorm.includes(kw))) {
-    return {
-      skip: true,
-      reason: `Irrelevant field — ${job.title}`,
-    };
+    return { skip: true, reason: `Irrelevant field — ${job.title}` };
   }
 
-  // ── 2. Check rescue signals — override everything if found ───────────────
-  // If the job mentions junior/training/mentorship anywhere, always score it
   const hasRescueSignal = RESCUE_SIGNALS.some((signal) =>
     fullText.includes(signal),
   );
-  if (hasRescueSignal) {
-    return { skip: false };
-  }
+  if (hasRescueSignal) return { skip: false };
 
-  // ── 3. No rescue signals — apply entry-level filters ────────────────────
   if (userExpLevel === "entry") {
-    // Skip senior titles
     if (SENIOR_TITLE_WORDS.some((w) => titleNorm.includes(w))) {
       return {
         skip: true,
         reason: `Senior title, no junior signals — ${job.title}`,
       };
     }
-
-    // Skip if description requires 2+ years experience
     const expMatch = descNorm.match(
       /(\d+)\s*\+?\s*(?:to\s*\d+\s*)?years?\s*(?:of\s*)?(?:experience|exp)/i,
     );
-    if (expMatch) {
-      const years = parseInt(expMatch[1]);
-      if (years >= 2) {
-        return {
-          skip: true,
-          reason: `Requires ${years}+ years experience, no junior signals`,
-        };
-      }
+    if (expMatch && parseInt(expMatch[1]) >= 2) {
+      return {
+        skip: true,
+        reason: `Requires ${expMatch[1]}+ years experience, no junior signals`,
+      };
     }
   }
 
-  // ── 4. Mid-level filters ──────────────────────────────────────────────────
   if (userExpLevel === "mid") {
     const expMatch = descNorm.match(
       /(\d+)\s*\+?\s*(?:to\s*\d+\s*)?years?\s*(?:of\s*)?(?:experience|exp)/i,
     );
-    if (expMatch) {
-      const years = parseInt(expMatch[1]);
-      if (years >= 6) {
-        return {
-          skip: true,
-          reason: `Requires ${years}+ years experience`,
-        };
-      }
+    if (expMatch && parseInt(expMatch[1]) >= 6) {
+      return {
+        skip: true,
+        reason: `Requires ${expMatch[1]}+ years experience`,
+      };
     }
   }
 
@@ -367,10 +332,6 @@ const shouldSkipJob = (job, userExpLevel = "entry") => {
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-const normalize = (str = "") => {
-  return str.toLowerCase().trim();
-};
-
 function expandSkill(skill) {
   const base = normalize(skill);
   if (SKILL_SYNONYMS[base]) return [base, ...SKILL_SYNONYMS[base]];
@@ -387,7 +348,7 @@ function skillsMatch(userSkill, requiredSkill) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DIMENSION 1 — Skills (35 pts)
+// SCORING DIMENSIONS
 // ─────────────────────────────────────────────────────────────────────────────
 const scoreSkills = (
   userSkills = [],
@@ -395,14 +356,11 @@ const scoreSkills = (
   niceToHaveSkills = [],
 ) => {
   if (!requiredSkills.length) return Math.round(WEIGHTS.skills * 0.65);
-
   const userNorm = userSkills.map(normalize);
-
   const matched = requiredSkills.filter((req) =>
     userNorm.some((u) => skillsMatch(u, req)),
   );
   const requiredScore = (matched.length / requiredSkills.length) * 25;
-
   let bonusScore = 0;
   if (niceToHaveSkills.length) {
     const bonusMatched = niceToHaveSkills.filter((req) =>
@@ -410,14 +368,9 @@ const scoreSkills = (
     );
     bonusScore = (bonusMatched.length / niceToHaveSkills.length) * 10;
   }
-
   return Math.min(WEIGHTS.skills, Math.round(requiredScore + bonusScore));
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DIMENSION 2 — Title Fit (20 pts)
-// Generic words like "developer" alone don't count — need meaningful overlap
-// ─────────────────────────────────────────────────────────────────────────────
 const GENERIC_WORDS = new Set([
   "developer",
   "engineer",
@@ -435,14 +388,9 @@ const GENERIC_WORDS = new Set([
 const scoreTitle = (userTitles = [], jobTitle = "") => {
   const jobNorm = normalize(jobTitle);
   let best = 0;
-
   for (const userTitle of userTitles) {
     const userNorm = normalize(userTitle);
-
-    // Exact match
     if (userNorm === jobNorm) return WEIGHTS.title;
-
-    // Cluster match
     for (const cluster of TITLE_CLUSTERS) {
       const inCluster = (t) =>
         cluster.some((c) => t.includes(c) || c.includes(t));
@@ -451,8 +399,6 @@ const scoreTitle = (userTitles = [], jobTitle = "") => {
         break;
       }
     }
-
-    // Meaningful word overlap — exclude generic words
     const userWords = new Set(
       userNorm
         .split(/\s+/)
@@ -464,46 +410,30 @@ const scoreTitle = (userTitles = [], jobTitle = "") => {
     const shared = jobWords.filter((w) => userWords.has(w)).length;
     if (shared >= 1) best = Math.max(best, Math.min(8, shared * 4));
   }
-
   return best;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DIMENSION 3 — Experience Level (15 pts)
-// ─────────────────────────────────────────────────────────────────────────────
 const scoreExperience = (userExpLevel = "entry", jobExpLevel = "") => {
   const userVal = EXPERIENCE_SCALE[normalize(userExpLevel)] ?? 1;
   const jobVal = EXPERIENCE_SCALE[normalize(jobExpLevel)] ?? 2;
   const diff = Math.abs(userVal - jobVal);
-
   if (diff === 0) return WEIGHTS.experience;
   if (diff === 1) return Math.round(WEIGHTS.experience * 0.67);
   if (diff === 2) return Math.round(WEIGHTS.experience * 0.27);
   return 0;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DIMENSION 4 — Location / Remote (12 pts)
-// ─────────────────────────────────────────────────────────────────────────────
 const scoreLocation = (userPrefs = {}, job = {}) => {
   const jobLoc = normalize(job.location || "");
   const userCity = normalize(userPrefs.city || "");
   const isRemote =
-    jobLoc.includes("remote") ||
-    job.remote === true ||
-    job.country === "remote" ||
-    jobLoc === "";
-
+    jobLoc.includes("remote") || job.remote === true || jobLoc === "";
   if (isRemote) return WEIGHTS.location;
   if (!jobLoc) return Math.round(WEIGHTS.location * 0.5);
-
   if (userCity && jobLoc.includes(userCity)) return WEIGHTS.location;
-
   const userCountry = normalize(userPrefs.country || "");
   if (userCountry && jobLoc.includes(userCountry))
     return Math.round(WEIGHTS.location * 0.5);
-
-  // Canadian cities — partial credit since user is in Canada
   const canadianCities = [
     "toronto",
     "vancouver",
@@ -517,19 +447,13 @@ const scoreLocation = (userPrefs = {}, job = {}) => {
   ];
   if (canadianCities.some((city) => jobLoc.includes(city)))
     return Math.round(WEIGHTS.location * 0.5);
-
   return 0;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DIMENSION 5 — Freshness (8 pts)
-// ─────────────────────────────────────────────────────────────────────────────
 const scoreFreshness = (postedAt) => {
   if (!postedAt) return Math.round(WEIGHTS.freshness * 0.5);
-
   const ageDays =
     (Date.now() - new Date(postedAt).getTime()) / (1000 * 60 * 60 * 24);
-
   if (ageDays < 3) return WEIGHTS.freshness;
   if (ageDays < 7) return Math.round(WEIGHTS.freshness * 0.75);
   if (ageDays < 14) return Math.round(WEIGHTS.freshness * 0.5);
@@ -537,120 +461,34 @@ const scoreFreshness = (postedAt) => {
   return 1;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DIMENSION 6 — Company Preference (5 pts)
-// ─────────────────────────────────────────────────────────────────────────────
 const scoreCompany = (userPrefs = {}, job = {}) => {
   const company = normalize(job.company || "");
   const source = normalize(job.source || "");
   const preferred = (userPrefs.preferred_companies || []).map(normalize);
   const blocked = (userPrefs.blocked_companies || []).map(normalize);
-
   if (blocked.some((b) => company.includes(b))) return -10;
   if (preferred.some((p) => company.includes(p) || source.includes(p)))
     return WEIGHTS.company;
-
   return Math.round(WEIGHTS.company * 0.6);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI SCORING
+// RULE-BASED SCORE — pure JS, no AI, runs on all jobs
 // ─────────────────────────────────────────────────────────────────────────────
-const calculateMatchScore = async (
-  userSkills,
-  job,
-  preScore,
-  userTitles,
-  experienceLevel,
-) => {
-  const prompt = `You are a fair and supportive technical recruiter evaluating a JUNIOR/ENTRY-LEVEL candidate.
-
-CANDIDATE:
-- Experience: ${experienceLevel || "entry"} level (0-1 year, recent graduate)
-- Skills: ${userSkills.join(", ")}
-- Target roles: ${userTitles.join(", ")}
-
-JOB:
-- Title: ${job.title}
-- Company: ${job.company}
-- Level: ${job.experience_level || "not specified"}
-- Description: ${(job.description || "").slice(0, 600)}
-
-Rule-based pre-score: ${preScore}/95
-
-IMPORTANT:
-- This job already passed a pre-filter (not irrelevant, not too senior)
-- Be FAIR and GENEROUS — entry level candidates rarely have 100% of skills
-- 50-60% skill match IS viable for junior roles
-- Transferable skills and learning potential count
-- Score the actual fit, not just keyword matches
-
-Tasks:
-1. SEMANTIC SKILL SCORE (0-5): skill match accounting for equivalent tech
-2. OVERALL SCORE (0-100): true fit, be fair
-3. matched_skills: relevant skills candidate has
-4. missing_skills: important gaps only
-5. reasoning: 2-3 sentences
-
-Respond ONLY with JSON (no markdown):
-{
-  "semantic_score": <0-5>,
-  "overall_score": <0-100>,
-  "matched_skills": ["..."],
-  "missing_skills": ["..."],
-  "reasoning": "..."
-}`;
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1000,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const text = response.content[0].text
-    .trim()
-    .replace(/```json|```/g, "")
-    .trim();
-  return JSON.parse(text);
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN MATCH FUNCTION
-// ─────────────────────────────────────────────────────────────────────────────
-const matchJobToUser = async (user, job, userPrefs = {}) => {
-  const userSkills = await getUserSkills(user.id);
-
-  if (userSkills.length === 0) {
-    console.log(`[Matching] User ${user.id} has no skills — skipping`);
-    return null;
-  }
-
-  // ── Pre-filter — kill irrelevant jobs before scoring ──────────────────────
-  const preFilter = shouldSkipJob(job, user.experience_level);
-  if (preFilter.skip) {
-    console.log(`[Matching] PRE-FILTER SKIP: ${preFilter.reason}`);
-    return {
-      job_id: job.id,
-      score: 0,
-      score_breakdown: null,
-      matched_skills: [],
-      missing_skills: [],
-      reasoning: preFilter.reason,
-      decision: "skip",
-      is_favourite: false,
-    };
-  }
-
-  const requiredSkills = job.required_skills || [];
-  const niceToHaveSkills = job.nice_to_have_skills || [];
-
-  // ── Resolve job_titles (supports array and legacy string) ─────────────────
+const scoreRuleBased = (userSkills, job, user, userPrefs = {}) => {
   const userTitles =
     Array.isArray(user.job_titles) && user.job_titles.length
       ? user.job_titles
       : [user.job_title || ""].filter(Boolean);
 
-  // ── Rule-based scores ────────────────────────────────────────────────────
+  const preFilter = shouldSkipJob(job, user.experience_level);
+  if (preFilter.skip) {
+    return { preScore: 0, skipped: true, reason: preFilter.reason, userTitles };
+  }
+
+  const requiredSkills = job.required_skills || [];
+  const niceToHaveSkills = job.nice_to_have_skills || [];
+
   const s_skills = scoreSkills(userSkills, requiredSkills, niceToHaveSkills);
   const s_title = scoreTitle(userTitles, job.title);
   const s_experience = scoreExperience(
@@ -666,7 +504,7 @@ const matchJobToUser = async (user, job, userPrefs = {}) => {
     s_skills + s_title + s_experience + s_location + s_freshness + s_company,
   );
 
-  console.log(`[Matching] "${job.title}" @ ${job.company} — pre-score:`, {
+  console.log(`[Matching] Rule-based "${job.title}" @ ${job.company}:`, {
     skills: s_skills,
     title: s_title,
     experience: s_experience,
@@ -676,19 +514,80 @@ const matchJobToUser = async (user, job, userPrefs = {}) => {
     preScore,
   });
 
-  // ── AI scoring ───────────────────────────────────────────────────────────
+  return {
+    preScore,
+    skipped: false,
+    breakdown: {
+      skills: s_skills,
+      title: s_title,
+      experience: s_experience,
+      location: s_location,
+      freshness: s_freshness,
+      company: s_company,
+    },
+    userTitles,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI SCORE — Haiku only, runs on top 15 jobs only
+// ─────────────────────────────────────────────────────────────────────────────
+const scoreWithAI = async (userSkills, job, preScore, user, userTitles) => {
+  const thresholds = getThresholds(user.experience_level);
+  const userThreshold = user.match_threshold || thresholds.default;
+  const favThreshold = user.favourite_threshold || thresholds.favourite;
+
+  const prompt = `You are a fair and supportive technical recruiter evaluating a JUNIOR/ENTRY-LEVEL candidate.
+
+CANDIDATE:
+- Experience: ${user.experience_level || "entry"} level (0-1 year, recent graduate)
+- Skills: ${userSkills.join(", ")}
+- Target roles: ${userTitles.join(", ")}
+
+JOB:
+- Title: ${job.title}
+- Company: ${job.company}
+- Level: ${job.experience_level || "not specified"}
+- Description: ${(job.description || "").slice(0, 600)}
+
+Rule-based pre-score: ${preScore}/95
+
+IMPORTANT:
+- Be FAIR and GENEROUS — entry level candidates rarely have 100% of skills
+- 50-60% skill match IS viable for junior roles
+- Transferable skills and learning potential count
+
+Tasks:
+1. SEMANTIC SKILL SCORE (0-5): skill match accounting for equivalent tech
+2. OVERALL SCORE (0-100): true fit
+3. matched_skills: relevant skills candidate has
+4. missing_skills: important gaps only
+5. reasoning: 2-3 sentences
+
+Respond ONLY with JSON (no markdown):
+{
+  "semantic_score": <0-5>,
+  "overall_score": <0-100>,
+  "matched_skills": ["..."],
+  "missing_skills": ["..."],
+  "reasoning": "..."
+}`;
+
   let aiResult;
   try {
-    aiResult = await calculateMatchScore(
-      userSkills,
-      job,
-      preScore,
-      userTitles,
-      user.experience_level,
-    );
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001", // Haiku — cheap, fast, good enough for scoring
+      max_tokens: 400,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const text = response.content[0].text
+      .trim()
+      .replace(/```json|```/g, "")
+      .trim();
+    aiResult = JSON.parse(text);
   } catch (err) {
     console.error(
-      "[Matching] AI scoring failed, using rule-based only:",
+      `[Matching] AI scoring failed for ${job.id}, using rule-based fallback:`,
       err.message,
     );
     aiResult = {
@@ -700,7 +599,6 @@ const matchJobToUser = async (user, job, userPrefs = {}) => {
     };
   }
 
-  // ── Semantic bonus ───────────────────────────────────────────────────────
   const s_semantic = Math.round(
     (aiResult.semantic_score / 5) * WEIGHTS.semantic,
   );
@@ -709,29 +607,18 @@ const matchJobToUser = async (user, job, userPrefs = {}) => {
     ruleBasedTotal * 0.7 + aiResult.overall_score * 0.3,
   );
 
-  // ── Decision ─────────────────────────────────────────────────────────────
-  const thresholds = getThresholds(user.experience_level);
-  const userThreshold = user.match_threshold || thresholds.default;
-  const favouriteThreshold = user.favourite_threshold || thresholds.favourite;
-
   const decision = finalScore >= userThreshold ? "apply" : "skip";
-  const isFavourite = finalScore >= favouriteThreshold;
+  const isFavourite = finalScore >= favThreshold;
 
   console.log(
-    `[Matching] "${job.title}" → final: ${finalScore} | rule: ${ruleBasedTotal} | ai: ${aiResult.overall_score} | decision: ${decision} | fav: ${isFavourite}`,
+    `[Matching] AI "${job.title}" → final: ${finalScore} | rule: ${ruleBasedTotal} | ai: ${aiResult.overall_score} | decision: ${decision}`,
   );
 
   return {
     job_id: job.id,
     score: finalScore,
     score_breakdown: {
-      skills: s_skills,
-      title: s_title,
-      experience: s_experience,
-      location: s_location,
-      freshness: s_freshness,
-      company: s_company,
-      semantic: s_semantic,
+      s_semantic,
       rule_total: ruleBasedTotal,
       ai_overall: aiResult.overall_score,
     },
@@ -757,8 +644,9 @@ const hasAppliedRecently = async (userId, jobId, reapplyDays = 60) => {
 };
 
 module.exports = {
-  matchJobToUser,
   getUserSkills,
   hasAppliedRecently,
   getThresholds,
+  scoreRuleBased,
+  scoreWithAI,
 };

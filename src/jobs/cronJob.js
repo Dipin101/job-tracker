@@ -58,7 +58,24 @@ const startCronJobs = () => {
     });
     console.log(`[Cron] Registered: ${schedule}`);
   });
-  console.log(`[Cron] ${SCHEDULES.length} schedules active`);
+  // ── Weekly digest — every Sunday at 8am ──────────────────────────────────
+  cron.schedule(
+    "0 8 * * 0",
+    async () => {
+      console.log("[Cron] Sending weekly digest...");
+      try {
+        const notificationService = require("../services/notificationService");
+        await notificationService.sendWeeklyDigest();
+      } catch (err) {
+        console.error("[Cron] Weekly digest failed:", err.message);
+      }
+    },
+    { timezone: "America/Toronto" },
+  );
+
+  console.log(
+    `[Cron] ${SCHEDULES.length} schedules active + weekly digest on Sundays`,
+  );
 };
 
 module.exports = { startCronJobs, runJobFetch };

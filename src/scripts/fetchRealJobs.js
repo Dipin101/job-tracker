@@ -365,8 +365,8 @@ const saveJobs = async (jobs) => {
         `INSERT INTO jobs
            (external_id, source, title, company, location, country,
             description, url, salary_min, salary_max,
-            experience_level, required_skills, posted_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+            experience_level, required_skills, posted_at, match_status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending')
          ON CONFLICT (external_id) DO NOTHING
          RETURNING id`,
         [

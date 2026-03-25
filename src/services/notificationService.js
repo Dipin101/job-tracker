@@ -1,5 +1,6 @@
 // src/services/notificationService.js
 const { Resend } = require("resend");
+const db = require("../db/db");
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -143,8 +144,8 @@ const sendFailedEmail = async (job, error = "Unknown error") => {
   );
 };
 
-// ─── Weekly digest ────────────────────────────────────────────────────────────
-const sendWeeklyDigest = async ({
+// ─── Daily digest ────────────────────────────────────────────────────────────
+const sendDailyDigest = async ({
   auto_applied = [],
   manual_required = [],
   failed = [],
@@ -152,7 +153,7 @@ const sendWeeklyDigest = async ({
   const total = auto_applied.length + manual_required.length + failed.length;
   if (total === 0) return;
 
-  const subject = `📋 Weekly Job Summary — ${auto_applied.length} applied, ${manual_required.length} need you`;
+  const subject = `📋 Daily Job Summary — ${auto_applied.length} applied, ${manual_required.length} need you`;
 
   const jobRow = (j) => `
     <tr>
@@ -191,10 +192,84 @@ const sendWeeklyDigest = async ({
   console.log(`[Notifications] 📋 Weekly digest sent — ${total} jobs`);
 };
 
+// ─── Weekly digest ────────────────────────────────────────────────────────────
+const sendWeeklyDigest = async () => {
+  const { rows } = await db.query(
+    `SELECT 
+       j.title, j.company, j.url, j.location,
+       a.status, a.match_score
+     FROM applications a
+     JOIN jobs j ON j.id = a.job_id
+     WHERE a.apply_attempted_at >= NOW() - INTERVAL '7 days'
+       AND a.status IN ('auto_applied', 'manual_required', 'failed')
+     ORDER BY a.apply_attempted_at DESC`,
+  );
+
+  const auto_applied = rows.filter((r) => r.status === "auto_applied");
+  const manual_required = rows.filter((r) => r.status === "manual_required");
+  const failed = rows.filter((r) => r.status === "failed");
+
+  const total = rows.length;
+  if (total === 0) {
+    console.log("[Notifications] No jobs this week — skipping weekly digest");
+    return;
+  }
+
+  const subject = `📋 Weekly Summary — ${auto_applied.length} applied, ${manual_required.length} need you`;
+
+  const jobRow = (j) => `
+    <tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb">${j.title}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb">${j.company}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb">${formatScore(j.match_score)}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb">
+        <a href="${j.url}" style="color:#2563eb">Link</a>
+      </td>
+    </tr>`;
+
+  const section = (title, color, jobs) =>
+    jobs.length === 0
+      ? ""
+      : `
+    <h3 style="color:${color};font-family:sans-serif;margin-top:24px">${title} (${jobs.length})</h3>
+    <table style="font-family:sans-serif;font-size:13px;border-collapse:collapse;width:100%">
+      <thead>
+        <tr style="background:#f3f4f6">
+          <th style="padding:8px 12px;text-align:left">Title</th>
+          <th style="padding:8px 12px;text-align:left">Company</th>
+          <th style="padding:8px 12px;text-align:left">Match</th>
+          <th style="padding:8px 12px;text-align:left">Link</th>
+        </tr>
+      </thead>
+      <tbody>${jobs.map(jobRow).join("")}</tbody>
+    </table>`;
+
+  const html = `
+    <h2 style="font-family:sans-serif">Weekly Job Summary</h2>
+    <p style="font-family:sans-serif;color:#6b7280">Last 7 days — ${new Date().toLocaleDateString(
+      "en-CA",
+      {
+        timeZone: "America/Toronto",
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      },
+    )}</p>
+    ${section("✅ Auto-Applied", "#16a34a", auto_applied)}
+    ${section("⚠️ Manual Apply Required", "#d97706", manual_required)}
+    ${section("❌ Failed", "#dc2626", failed)}
+  `;
+
+  await sendMail({ subject, html });
+  console.log(`[Notifications] 📋 Weekly digest sent — ${total} jobs`);
+};
+
 module.exports = {
   verifyConnection,
   sendAppliedEmail,
   sendManualRequiredEmail,
   sendFailedEmail,
+  sendDailyDigest,
   sendWeeklyDigest,
 };
