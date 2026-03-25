@@ -2,11 +2,15 @@ const cron = require("node-cron");
 const db = require("../db/db");
 
 const SCHEDULES = [
-  "0 8 * * 1-5",
-  "0 10 * * 1-5",
-  "0 13 * * 1-5",
-  "0 15 * * 1-5",
-  "0 9 * * 6,0",
+  "0 7 * * 1-5", // 7am weekdays
+  "0 9 * * 1-5", // 9am
+  "0 11 * * 1-5", // 11am
+  "0 13 * * 1-5", // 1pm
+  "0 15 * * 1-5", // 3pm
+  "0 17 * * 1-5", // 5pm — catches end of day postings
+  "0 8 * * 6,0", // 8am weekends
+  "0 11 * * 6,0", // 11am weekends
+  "0 14 * * 6,0", // 2pm weekends
 ];
 
 const runJobFetch = async () => {
