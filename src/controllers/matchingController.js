@@ -129,7 +129,7 @@ const updateApplication = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { id } = req.params;
-    const { status, notes } = req.body;
+    const { status, notes, is_favourite } = req.body;
 
     const validStatuses = [
       "manually_applied",
@@ -152,10 +152,11 @@ const updateApplication = async (req, res) => {
        SET
          status = COALESCE($1, status),
          notes  = COALESCE($2, notes),
+         is_favourite = COALESCE($3, is_favourite),
          updated_at = NOW()
-       WHERE id = $3 AND user_id = $4
+       WHERE id = $4 AND user_id = $5
        RETURNING *`,
-      [status || null, notes || null, id, userId],
+      [status || null, notes || null, is_favourite ?? null, id, userId],
     );
 
     if (!rows.length) {
