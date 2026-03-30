@@ -81,17 +81,19 @@ STRICT RULES:
 - "- " for bullets
 - No contact info — added automatically
 - Start with first section header
-- HARD LIMIT: 1 page maximum — total bullets across all sections max 10
+- HARD LIMIT: 1 page maximum — total bullets across all sections max 9
 - NEVER overflow — the PDF cuts at 1 page
-- Education and certificates MUST always be visible — if they don't fit, remove bullets not sections
-- Work experience: maximum 3 bullets for HIGH relevance roles, maximum 2 for MEDIUM relevance
-- Projects: maximum 2 bullets each
+- Education now appears above Work Experience — account for this extra vertical space by being aggressive with bullet trimming
+- Work experience: maximum 2 bullets per role regardless of relevance
+- Projects: maximum 2 bullets each, maximum 3 projects shown
+- Career summary: maximum 2 sentences, never 3
 
 LAYOUT STRATEGY:
-- HIGH relevance role/project → 3 bullets maximum, each max 2 lines
-- MEDIUM relevance → 2 bullets
-- LOW relevance → 1 bullet or omit
-- Target 98-100% page fill — not sparse, not overflowing
+- All roles: maximum 2 bullets, each max 2 lines
+- HIGH relevance project → 2 bullets
+- LOW relevance role/project → 1 bullet or omit entirely
+- Target 95-98% page fill — not sparse, not overflowing
+- Education now sits above Work Experience — this consumes extra vertical space, compensate by trimming bullets aggressively
 
 WORK EXPERIENCE FORMAT:
 JOB TITLE | Company | Location    Month Year – Month Year
@@ -172,6 +174,7 @@ CORRECTION PASS — Dynamic fill: ${(dynamicFillRatio * 100).toFixed(1)}% (under
 Expand work experience and projects to fill space:
 - Expand the ${Math.ceil(underBy / 5)} most relevant bullets by 1 line with specific detail from the CV
 - If still under, add a bullet to the most relevant role or project
+- HARD LIMIT: never exceed 2 bullets per work experience role
 - Do NOT touch education, certificates, skills, or summary
 - Do NOT fabricate anything — only use what is in the CV
 - Keep ALL bullets under 120 characters
@@ -270,6 +273,7 @@ STRICT RULES
 - Target 250-270 words total across all 3 paragraphs
 - Do NOT include date, address, greeting, sign-off, or name — added automatically
 - Output ONLY the 3 body paragraphs separated by blank lines, nothing else
+- NEVER use bullet points, dashes, or lists — prose paragraphs only
  
 ════════════════════════════════════════
 CANDIDATE DATA
