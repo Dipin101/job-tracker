@@ -49,13 +49,18 @@ router.post("/run", async (req, res) => {
     console.log(`[Pipeline] [${payload.stage}] ${payload.message}`);
   };
 
-  try {
-    const result = await pipelineService.run(userId, send);
-    return res.json({ ...result, logs });
-  } catch (err) {
-    console.error("[Pipeline] Fatal error:", err.message);
-    return res.status(500).json({ error: err.message, logs });
-  }
+  // try {
+  //   const result = await pipelineService.run(userId, send);
+  //   return res.json({ ...result, logs });
+  // } catch (err) {
+  //   console.error("[Pipeline] Fatal error:", err.message);
+  //   return res.status(500).json({ error: err.message, logs });
+  // }
+  pipelineService.run(userId, send).catch((err) => {
+    console.error("[Pipeline] Background run failed:", err.message);
+  });
+
+  return res.json({ message: "Pipeline started", status: "running" });
 });
 
 router.get("/status", async (req, res) => {

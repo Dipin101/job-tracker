@@ -19,6 +19,7 @@ app.use(
       process.env.CLIENT_URL,
       "https://app.jobtrackers.org",
       "https://job-tracker-zeta-ashy.vercel.app",
+      "https://jobtrackers.org",
       "http://localhost:5173",
     ].filter(Boolean),
     credentials: true,
