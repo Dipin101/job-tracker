@@ -120,7 +120,8 @@ const Applications = () => {
         is_favourite:
           a.is_favourite === true ||
           a.is_favourite === "t" ||
-          a.is_favourite === "true",
+          a.is_favourite === "true" ||
+          (a.match_score != null && a.match_score >= 70),
       }));
       setApplications(apps);
       setLastUpdated(new Date());
@@ -141,7 +142,9 @@ const Applications = () => {
         is_favourite:
           res.data.application.is_favourite === true ||
           res.data.application.is_favourite === "t" ||
-          res.data.application.is_favourite === "true",
+          res.data.application.is_favourite === "true" ||
+          (res.data.application.match_score != null &&
+            res.data.application.match_score >= 70),
       };
       setApplications((prev) =>
         prev.map((a) => (a.id === appId ? { ...a, ...updated } : a)),

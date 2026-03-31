@@ -181,7 +181,7 @@ const sendDailyDigest = async ({
     </table>`;
 
   const html = `
-    <h2 style="font-family:sans-serif">Job Application Weekly Summary</h2>
+    <h2 style="font-family:sans-serif">Job Application Daily Summary</h2>
     <p style="font-family:sans-serif;color:#6b7280">${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto", weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
     ${section("✅ Auto-Applied", "#16a34a", auto_applied)}
     ${section("⚠️ Manual Apply Required", "#d97706", manual_required)}
@@ -202,6 +202,9 @@ const sendWeeklyDigest = async () => {
      JOIN jobs j ON j.id = a.job_id
      WHERE a.apply_attempted_at >= NOW() - INTERVAL '7 days'
        AND a.status IN ('auto_applied', 'manual_required', 'failed')
+       AND j.location NOT ILIKE '%Quebec%'
+       AND j.location NOT ILIKE '%, QC%'
+       AND j.location NOT ILIKE '%Québec%'
      ORDER BY a.apply_attempted_at DESC`,
   );
 

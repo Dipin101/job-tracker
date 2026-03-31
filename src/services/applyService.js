@@ -157,6 +157,9 @@ const processAllMatched = async (
    INNER JOIN applications a ON a.job_id = j.id AND a.user_id = $1
    WHERE a.match_score >= $2
      AND a.status = 'pending'
+     AND j.location NOT ILIKE '%Quebec%'
+     AND j.location NOT ILIKE '% QC%'
+     AND j.location NOT ILIKE '%Québec%'
    ORDER BY a.match_score DESC
    LIMIT $3`,
     [userId, threshold, limit],
