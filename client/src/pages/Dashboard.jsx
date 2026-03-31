@@ -95,6 +95,7 @@ const Dashboard = () => {
     try {
       const res = await api.get("/matching/stats");
       setStats(res.data);
+      console.log(stats);
       // const apps = res.data.applications;
       // setStats({
       //   total: apps.length,
