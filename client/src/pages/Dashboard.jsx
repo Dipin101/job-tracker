@@ -186,13 +186,13 @@ const Dashboard = () => {
       stopStageCycle();
       setCurrentStage("done");
 
-      addLog(`Fetched ${data.fetchedCount ?? 0} jobs`, "info");
-      addLog(`${data.processed ?? 0} jobs matched your threshold`, "info");
-      addLog(
-        `Applied to ${data.autoApplied ?? 0} jobs, ${data.manualRequired ?? 0} need manual review`,
-        "success",
-      );
-      addLog("Pipeline complete ✓", "success");
+      // addLog(`Fetched ${data.fetchedCount ?? 0} jobs`, "info");
+      // addLog(`${data.processed ?? 0} jobs matched your threshold`, "info");
+      // addLog(
+      //   `Applied to ${data.autoApplied ?? 0} jobs, ${data.manualRequired ?? 0} need manual review`,
+      //   "success",
+      // );
+      addLog("Pipeline started - running in background", "info");
 
       setPipelineStats({
         fetched: data.fetchedCount,
