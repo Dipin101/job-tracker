@@ -115,7 +115,14 @@ const Applications = () => {
     else setRefreshing(true);
     try {
       const res = await api.get("/matching/applications?limit=200");
-      setApplications(res.data.applications);
+      const apps = res.data.applications.map((a) => ({
+        ...a,
+        is_favourite:
+          a.is_favourite === true ||
+          a.is_favourite === "t" ||
+          a.is_favourite === "true",
+      }));
+      setApplications(apps);
       setLastUpdated(new Date());
     } catch (err) {
       console.error("Failed to fetch applications:", err);
@@ -129,7 +136,13 @@ const Applications = () => {
     setSaving((prev) => ({ ...prev, [appId]: true }));
     try {
       const res = await api.patch(`/matching/applications/${appId}`, payload);
-      const updated = res.data.application;
+      const updated = {
+        ...res.data.application,
+        is_favourite:
+          res.data.application.is_favourite === true ||
+          res.data.application.is_favourite === "t" ||
+          res.data.application.is_favourite === "true",
+      };
       setApplications((prev) =>
         prev.map((a) => (a.id === appId ? { ...a, ...updated } : a)),
       );
@@ -394,7 +407,7 @@ const Applications = () => {
                       </div>
 
                       <div
-                        className="flex items-center gap-2 flex-shrink-0 flex-wrap"
+                        className="flex items-center gap-2 shrink-0 flex-wrap"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <span

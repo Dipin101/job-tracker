@@ -5,7 +5,7 @@ const {
   scoreRuleBased,
   scoreWithAI,
   hasAppliedRecently,
-  getThresholds,
+  // getThresholds,
 } = require("./matchingService");
 
 // ─────────────────────────────────────────────────────────────────────────────

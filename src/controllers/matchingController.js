@@ -105,11 +105,12 @@ const getApplications = async (req, res) => {
       params.push(status);
     }
     if (is_favourite === "true") {
-      conditions.push(`a.is_favourite = true`);
+      conditions.push(`a.is_favourite = $${i++}`);
+      params.push(true);
     }
 
     const result = await db.query(
-      `SELECT a.*, j.title, j.company, j.location, j.url, j.salary_min, j.salary_max, j.description, j.posted_at
+      `SELECT a.*, a.is_favourite::boolean as is_favourite, j.title, j.company, j.location, j.url, j.salary_min, j.salary_max, j.description, j.posted_at
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE ${conditions.join(" AND ")}

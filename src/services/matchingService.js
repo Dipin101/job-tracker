@@ -281,14 +281,65 @@ const SENIOR_TITLE_WORDS = [
 ];
 
 const normalize = (str = "") => str.toLowerCase().trim();
+const QUEBEC_KEYWORDS = [
+  "montreal",
+  "montréal",
+  "quebec",
+  "québec",
+  "laval",
+  "longueuil",
+  "gatineau",
+];
+const DEALBREAKER_STACK = [
+  "java developer",
+  "java engineer",
+  "spring boot developer",
+  "spring framework",
+  ".net developer",
+  ".net engineer",
+  "c# developer",
+  "angular developer",
+  "php developer",
+  "ruby on rails",
+  "golang developer",
+];
 
-const shouldSkipJob = (job, userExpLevel = "entry") => {
+const shouldSkipJob = (job, userExpLevel = "entry", userSkills = []) => {
   const titleNorm = normalize(job.title || "");
   const descNorm = normalize((job.description || "").slice(0, 1000));
   const fullText = titleNorm + " " + descNorm;
 
+  const locationNorm = normalize(job.location || "");
+  if (QUEBEC_KEYWORDS.some((kw) => locationNorm.includes(kw))) {
+    return { skip: true, reason: `Quebec location - French required` };
+  }
+
   if (ALWAYS_IRRELEVANT_TITLES.some((kw) => titleNorm.includes(kw))) {
     return { skip: true, reason: `Irrelevant field — ${job.title}` };
+  }
+
+  if (SENIOR_TITLE_WORDS.some((w) => titleNorm.includes(w))) {
+    return { skip: true, reason: `Senior title - ${job.title}` };
+  }
+
+  const hasStackMatch = userSkills.some((skill) => {
+    const expanded = expandSkill(skill);
+    return expanded.some((s) => fullText.includes(s));
+  });
+
+  const hasDealbreaker = DEALBREAKER_STACK.some((tech) =>
+    fullText.includes(tech),
+  );
+
+  if (hasDealbreaker && !hasStackMatch) {
+    return {
+      skip: true,
+      reason: `Primary stack mismatch — excluded technology`,
+    };
+  }
+
+  if (!hasStackMatch) {
+    return { skip: true, reason: `Stack mismatch — no relevant skills found` };
   }
 
   const hasRescueSignal = RESCUE_SIGNALS.some((signal) =>
@@ -297,12 +348,6 @@ const shouldSkipJob = (job, userExpLevel = "entry") => {
   if (hasRescueSignal) return { skip: false };
 
   if (userExpLevel === "entry") {
-    if (SENIOR_TITLE_WORDS.some((w) => titleNorm.includes(w))) {
-      return {
-        skip: true,
-        reason: `Senior title, no junior signals — ${job.title}`,
-      };
-    }
     const expMatch = descNorm.match(
       /(\d+)\s*\+?\s*(?:to\s*\d+\s*)?years?\s*(?:of\s*)?(?:experience|exp)/i,
     );
@@ -437,7 +482,6 @@ const scoreLocation = (userPrefs = {}, job = {}) => {
   const canadianCities = [
     "toronto",
     "vancouver",
-    "montreal",
     "calgary",
     "ottawa",
     "edmonton",
@@ -481,7 +525,7 @@ const scoreRuleBased = (userSkills, job, user, userPrefs = {}) => {
       ? user.job_titles
       : [user.job_title || ""].filter(Boolean);
 
-  const preFilter = shouldSkipJob(job, user.experience_level);
+  const preFilter = shouldSkipJob(job, user.experience_level, userSkills);
   if (preFilter.skip) {
     return { preScore: 0, skipped: true, reason: preFilter.reason, userTitles };
   }
