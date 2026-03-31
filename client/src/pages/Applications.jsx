@@ -117,7 +117,11 @@ const Applications = () => {
     else setRefreshing(true);
     try {
       const statusParam =
-        filter !== "all" && filter !== "favourites" ? `&status=${filter}` : "";
+        filter === "favourites"
+          ? "&is_favourite=true"
+          : filter !== "all"
+            ? `&status=${filter}`
+            : "";
       const res = await api.get(
         `/matching/applications?limit=50&offset=${(currentPage - 1) * 50}${statusParam}`,
       );
