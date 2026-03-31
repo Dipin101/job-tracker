@@ -181,10 +181,39 @@ const updateApplication = async (req, res) => {
   }
 };
 
+const getStats = async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status IN ('applied', 'auto_applied', 'manually_applied')) as applied,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'skipped') as skipped,
+        COUNT(*) FILTER (WHERE is_favourite = true) as favourites
+      FROM applications
+      WHERE user_id = $1`,
+      [req.user.userId],
+    );
+
+    const row = result.rows[0];
+    return res.json({
+      total: parseInt(row.total),
+      applied: parseInt(row.applied),
+      pending: parseInt(row.pending),
+      skipped: parseInt(row.skipped),
+      favourites: parseInt(row.favourites),
+    });
+  } catch (err) {
+    console.error("[MatchingController] getStats error:", err.message);
+    return res.status(500).json({ error: "Failed to retrieve stats" });
+  }
+};
+
 module.exports = {
   runMatching,
   matchSingleJob,
   getMySkills,
   getApplications,
   updateApplication,
+  getStats,
 };

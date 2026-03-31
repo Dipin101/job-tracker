@@ -93,17 +93,18 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await api.get("/matching/applications?limit=500");
-      const apps = res.data.applications;
-      setStats({
-        total: apps.length,
-        applied: apps.filter((a) =>
-          ["applied", "auto_applied", "manually_applied"].includes(a.status),
-        ).length,
-        pending: apps.filter((a) => a.status === "pending").length,
-        skipped: apps.filter((a) => a.status === "skipped").length,
-        favourites: apps.filter((a) => a.is_favourite).length,
-      });
+      const res = await api.get("/matching/stats");
+      setStats(res.data);
+      // const apps = res.data.applications;
+      // setStats({
+      //   total: apps.length,
+      //   applied: apps.filter((a) =>
+      //     ["applied", "auto_applied", "manually_applied"].includes(a.status),
+      //   ).length,
+      //   pending: apps.filter((a) => a.status === "pending").length,
+      //   skipped: apps.filter((a) => a.status === "skipped").length,
+      //   favourites: apps.filter((a) => a.is_favourite).length,
+      // });
     } catch (err) {
       console.error("Failed to fetch stats:", err);
     }

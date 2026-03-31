@@ -240,9 +240,9 @@ const Applications = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">
             Applications
-            {filtered.length > 0 && (
+            {total > 0 && (
               <span className="ml-2 text-base font-normal text-gray-500">
-                ({filtered.length})
+                ({total})
               </span>
             )}
           </h2>
