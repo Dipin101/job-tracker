@@ -106,7 +106,7 @@ const Applications = () => {
       30000,
     );
     return () => clearInterval(intervalRef.current);
-  }, [page]);
+  }, [page, filter]);
 
   useEffect(() => {
     setPage(1);
@@ -116,8 +116,10 @@ const Applications = () => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
+      const statusParam =
+        filter !== "all" && filter !== "favourites" ? `&status=${filter}` : "";
       const res = await api.get(
-        `/matching/applications?limit=50&offset=${(currentPage - 1) * 50}`,
+        `/matching/applications?limit=50&offset=${(currentPage - 1) * 50}${statusParam}`,
       );
       const apps = res.data.applications.map((a) => ({
         ...a,
