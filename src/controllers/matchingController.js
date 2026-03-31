@@ -114,12 +114,22 @@ const getApplications = async (req, res) => {
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE ${conditions.join(" AND ")}
-       ORDER BY a.match_score DESC, a.applied_at DESC
+       ORDER BY a.apply_attempted_at DESC, a.match_score DESC
        LIMIT $${i} OFFSET $${i + 1}`,
       [...params, parseInt(limit), parseInt(offset)],
     );
 
-    return res.json({ applications: result.rows, count: result.rows.length });
+    const countResult = await db.query(
+      `SELECT COUNT(*) FROM applications a WHERE ${conditions.join(" AND ")}`,
+      params,
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    return res.json({
+      applications: result.rows,
+      count: result.rows.length,
+      total,
+    });
   } catch (err) {
     console.error("[MatchingController] getApplications error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve applications" });

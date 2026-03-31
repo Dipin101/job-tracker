@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 
-const PAGE_SIZE = 10;
-
 const statusColors = {
   applied: "bg-green-900/40 text-green-400 border-green-800",
   auto_applied: "bg-green-900/40 text-green-400 border-green-800",
@@ -99,22 +97,28 @@ const Applications = () => {
   const [notesDraft, setNotesDraft] = useState({});
   const [saving, setSaving] = useState({});
   const intervalRef = useRef(null);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    fetchApplications();
-    intervalRef.current = setInterval(() => fetchApplications(true), 30000);
+    fetchApplications(false, page);
+    intervalRef.current = setInterval(
+      () => fetchApplications(true, page),
+      30000,
+    );
     return () => clearInterval(intervalRef.current);
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     setPage(1);
   }, [filter, search, sort]);
 
-  const fetchApplications = async (silent = false) => {
+  const fetchApplications = async (silent = false, currentPage = 1) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const res = await api.get("/matching/applications?limit=200");
+      const res = await api.get(
+        `/matching/applications?limit=50&offset=${(currentPage - 1) * 50}`,
+      );
       const apps = res.data.applications.map((a) => ({
         ...a,
         is_favourite:
@@ -124,6 +128,7 @@ const Applications = () => {
           (a.match_score != null && a.match_score >= 70),
       }));
       setApplications(apps);
+      setTotal(res.data.total);
       setLastUpdated(new Date());
     } catch (err) {
       console.error("Failed to fetch applications:", err);
@@ -218,8 +223,8 @@ const Applications = () => {
     });
   }
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(total / 50));
+  const paginated = filtered;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -242,7 +247,7 @@ const Applications = () => {
               </span>
             )}
             <button
-              onClick={() => fetchApplications(true)}
+              onClick={() => fetchApplications(true, page)}
               disabled={refreshing}
               className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-lg text-xs text-gray-300 transition flex items-center gap-1.5"
             >
